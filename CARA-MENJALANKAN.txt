@@ -1,0 +1,148 @@
+=====================================================================
+ GAME 2D MULTIPLAYER - PANDUAN LENGKAP
+=====================================================================
+
+ISI PROYEK
+  index.html, game.js, assets/   -> game (dihosting di GitHub Pages)
+  server/                        -> server multiplayer (dihosting di Render)
+
+KONTROL
+  WASD / tombol panah   bergerak (di HP: tombol di layar)
+  Enter                 mulai mengetik chat, Enter lagi untuk kirim, Esc batal
+  Tombol di kanan atas  Musik, Efek langkah, Ganti nama, Kostum
+
+---------------------------------------------------------------------
+ A. MENCOBA DI KOMPUTER SENDIRI (disarankan sebelum online)
+---------------------------------------------------------------------
+Butuh: Node.js (nodejs.org, pilih versi LTS) dan Python (untuk server web lokal).
+
+1. Jalankan SERVER. Buka terminal di folder "server", lalu ketik:
+       npm install
+       npm start
+   Muncul tulisan "Server berjalan di port 3000". Biarkan terminal ini terbuka.
+
+2. Jalankan GAME. Buka terminal BARU di folder utama (yang berisi index.html):
+       python -m http.server 8000
+   (di Mac/Linux kadang: python3 -m http.server 8000)
+
+3. Buka http://localhost:8000 di browser. Isi nama, lalu Mulai Main.
+   Di kiri atas harus tertulis "Online: 1 pemain".
+
+4. Untuk mencoba dua pemain: buka http://localhost:8000 lagi di JENDELA INCOGNITO
+   (atau browser lain) supaya bisa memakai nama berbeda. Gerakkan satu karakter,
+   dan lihat di jendela lainnya.
+   Catatan: dua tab biasa di browser yang sama berbagi nama yang tersimpan.
+
+Jika di kiri atas tertulis "Tidak terhubung ke server", berarti langkah 1 belum
+berjalan, atau alamat di game.js (serverUrl) tidak cocok dengan port server.
+
+---------------------------------------------------------------------
+ B. MEMASANG ONLINE (gratis): game di GitHub Pages + server di Render
+---------------------------------------------------------------------
+Langkah 1 - Unggah ke GitHub
+  1. Buat akun di github.com, lalu buat repository baru (Public), misalnya "game-saya".
+  2. Unggah SEMUA isi folder ini: index.html, game.js, assets, folder server
+     (kecuali node_modules kalau ada). Lewat "Add file" > "Upload files".
+     index.html harus berada di paling atas repository.
+
+Langkah 2 - Pasang SERVER di Render
+  1. Buka render.com, daftar dengan akun GitHub.
+  2. Klik "New +" > "Web Service", lalu pilih repository "game-saya".
+  3. Isi pengaturan:
+       Root Directory   : server
+       Runtime          : Node
+       Build Command    : npm install
+       Start Command    : npm start
+       Instance Type    : Free
+  4. Buka bagian "Environment Variables", tambahkan:
+       ALLOWED_ORIGINS = https://NAMAAKUN.github.io
+     (ganti NAMAAKUN dengan nama akun GitHub Anda; tanpa garis miring di akhir,
+      tanpa nama repository). Ini mencegah situs lain memakai server Anda.
+  5. Klik "Create Web Service" dan tunggu sampai berstatus "Live".
+  6. Salin alamatnya di bagian atas halaman, bentuknya
+       https://nama-game.onrender.com
+
+Langkah 3 - Sambungkan game ke server
+  1. Di GitHub, buka file game.js, klik ikon pensil (Edit).
+  2. Cari baris serverUrl di bagian CONFIG, ubah menjadi alamat Render dengan
+     awalan wss:// (BUKAN https://):
+       serverUrl: "wss://nama-game.onrender.com",
+  3. Klik "Commit changes".
+
+Langkah 4 - Aktifkan GitHub Pages
+  1. Repository > Settings > Pages.
+  2. Source: "Deploy from a branch", Branch: main, folder: / (root), lalu Save.
+  3. Tunggu 1-2 menit. Alamat game: https://NAMAAKUN.github.io/game-saya/
+  4. Bagikan alamat itu. Siapa pun yang membukanya akan bertemu di dunia yang sama.
+
+PERLU DIKETAHUI TENTANG PAKET GRATIS RENDER
+  - Server gratis akan "tertidur" jika lama tidak ada pengunjung. Pemain pertama
+    setelah itu menunggu sekitar satu menit sampai server bangun. Selama itu status
+    tertulis "Menghubungkan..." lalu tersambung sendiri. Pemain berikutnya langsung cepat.
+  - Batas dan syarat paket gratis bisa berubah. Cek halaman harga Render sebelum
+    mengandalkannya untuk game yang ramai.
+  - Server menyimpan data di memori. Jika server dimulai ulang, semua pemain
+    tersambung ulang otomatis, dan posisi mereka dimulai lagi dari posisi terakhir di layar masing-masing.
+
+---------------------------------------------------------------------
+ C. PENGATURAN SERVER (Environment Variables di Render, atau saat npm start)
+---------------------------------------------------------------------
+  ALLOWED_ORIGINS  Alamat web yang boleh terhubung, pisahkan dengan koma.
+                   Kosong = semua boleh (cocok untuk tes lokal).
+                   Contoh: https://akun.github.io,http://localhost:8000
+  MAX_PLAYERS      Batas pemain bersamaan (bawaan 50).
+  MAX_PER_IP       Batas koneksi dari satu jaringan (bawaan 10).
+  BLOCKED_WORDS    Kata yang disensor di chat dan ditolak di nama, pisahkan dengan koma.
+                   Contoh: kata1,kata2,kata3
+  WORLD_WIDTH, WORLD_HEIGHT   Ukuran peta (bawaan 3000 x 3000). Ukuran dari server
+                   otomatis dipakai oleh game.
+
+Pemeriksaan otomatis di server:
+  - Nama 2-16 huruf; karakter kontrol dan karakter pembalik arah teks dibuang.
+  - Chat maksimal 80 huruf, jeda minimal 0,7 detik antar pesan.
+  - Kostum harus berformat benar (id huruf kecil, warna #rrggbb).
+  - Posisi dibatasi di dalam peta; pesan terlalu besar atau terlalu sering ditolak.
+
+---------------------------------------------------------------------
+ D. MENGUBAH GAME
+---------------------------------------------------------------------
+Semua pengaturan ada di bagian CONFIG pada game.js (ukuran peta, kecepatan, volume,
+durasi chat, serverUrl, dan lain-lain).
+
+Gambar (semua 5 frame, ukuran kanvas SAMA, latar transparan):
+  assets/background.png
+  assets/body/1.png ... 5.png            badan (warna kulit)
+  assets/pants/jeans/1.png ... 5.png     celana
+  assets/shoes/boots/1.png ... 5.png     sepatu
+  assets/shirt/hoodie/1.png ... 5.png    baju
+  assets/hat/cap/1.png ... 5.png         topi
+Bagian yang ingin bisa diwarnai digambar putih/abu-abu terang; garis tepi gelap tetap terlihat.
+
+Menambah kostum baru:
+  1. Buat folder assets/<bagian>/<nama>/ berisi 1.png ... 5.png
+  2. Tambahkan satu baris di daftar PARTS pada game.js, contoh:
+         { id: "tophat", name: "Topi Tinggi", tint: true }
+     id hanya boleh huruf kecil, angka, - dan _ (maks 24 karakter).
+  3. Jika gambar sudah berwarna penuh dan tidak ingin diwarnai: tint: false
+  Pemain lain otomatis melihat kostum baru itu, selama mereka memuat versi game.js yang sama.
+
+Suara (assets/audio/): bgm.wav (musik latar), step1.wav dan step2.wav (langkah).
+  Ganti dengan file Anda dan sesuaikan nama di CONFIG jika berbeda. Untuk game yang sudah
+  online, ubah ke .ogg atau .mp3 agar ukurannya kecil. Pakai suara yang Anda punya haknya.
+
+Jika gambar asli menghadap KIRI, ubah spriteFacesRight menjadi false.
+
+CATATAN GITHUB PAGES
+  - Nama file dan folder membedakan huruf besar/kecil. Pakai huruf kecil semua.
+  - Setelah mengubah file, tekan Ctrl+F5 agar browser memuat versi baru.
+
+---------------------------------------------------------------------
+ E. BATASAN YANG PERLU ANDA TAHU
+---------------------------------------------------------------------
+  - Server mempercayai posisi yang dikirim pemain (hanya dibatasi di dalam peta).
+    Pemain yang paham teknis bisa curang, misalnya berpindah tempat seketika. Untuk game
+    santai ini tidak masalah, tapi jangan dipakai untuk hal yang menyangkut persaingan.
+  - Belum ada tabrakan antar pemain, akun, atau penyimpanan permanen di server.
+  - Filter kata hanya sebatas daftar yang Anda isi di BLOCKED_WORDS. Untuk game publik
+    yang ramai, tetap perlu pemantauan.
+  - Satu server memadai untuk puluhan pemain. Untuk ratusan pemain perlu desain yang berbeda.

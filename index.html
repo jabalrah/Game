@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>Game 2D Pertamaku</title>
+  <style>
+    html, body { margin:0; height:100%; overflow:hidden; background:#111; touch-action:none;
+                 font-family:system-ui, sans-serif; }
+    canvas#game { display:block; width:100%; height:100%; }
+
+    #info { position:fixed; top:8px; left:8px; display:flex; flex-direction:column;
+            gap:4px; align-items:flex-start; pointer-events:none; }
+    #info div { color:#fff; font-size:13px; background:rgba(0,0,0,.45);
+                padding:4px 8px; border-radius:6px; }
+
+    #topbar { position:fixed; top:8px; right:8px; display:flex; gap:6px; }
+    #topbar button { padding:10px 12px; border:0; border-radius:10px; background:#fff;
+                     font-size:15px; cursor:pointer; }
+    #topbar button.off { background:#bbb; color:#555; }
+    #topbar button.off .tx { text-decoration:line-through; }
+
+    #dpad { position:fixed; left:16px; bottom:16px; display:grid;
+            grid-template-columns:repeat(3,56px); grid-template-rows:repeat(3,56px); gap:6px;
+            opacity:.6; user-select:none; -webkit-user-select:none; }
+    #dpad button { border:0; border-radius:12px; background:#fff; font-size:22px; touch-action:none; }
+    #dpad .up{grid-column:2;grid-row:1} #dpad .left{grid-column:1;grid-row:2}
+    #dpad .right{grid-column:3;grid-row:2} #dpad .down{grid-column:2;grid-row:3}
+
+    #panel { position:fixed; top:56px; right:8px; width:290px; max-height:calc(100% - 72px);
+             overflow-y:auto; background:#fff; border-radius:14px; padding:14px;
+             box-shadow:0 6px 24px rgba(0,0,0,.4); display:none; touch-action:pan-y; }
+    #panel.open { display:block; }
+    #panel h3 { margin:0 0 8px; font-size:16px; }
+    #preview { display:block; margin:0 auto 10px; background:#7fae73; border-radius:10px; }
+    .row { display:flex; align-items:center; gap:6px; margin:8px 0; }
+    .row .label { width:62px; font-size:13px; color:#444; }
+    .row .name { flex:1; text-align:center; font-size:14px; }
+    .row button { width:30px; height:30px; border:1px solid #ccc; border-radius:8px;
+                  background:#f5f5f5; cursor:pointer; }
+    .row input[type=color] { width:36px; height:30px; padding:0; border:1px solid #ccc;
+                             border-radius:8px; background:none; cursor:pointer; }
+    .swatches { display:flex; gap:6px; flex:1; flex-wrap:wrap; }
+    .swatches span { width:22px; height:22px; border-radius:50%; border:2px solid #fff;
+                     outline:1px solid #bbb; cursor:pointer; }
+    #btnRandom, #btnReset { margin-top:8px; padding:8px; width:100%; border:1px solid #ccc;
+                            border-radius:8px; background:#f5f5f5; cursor:pointer; }
+
+    #chatBox { position:fixed; bottom:16px; right:16px; width:min(340px, calc(100% - 232px));
+               display:flex; gap:6px; }
+    #chatInput { flex:1; min-width:0; padding:10px 12px; border:0; border-radius:10px;
+                 font-size:15px; background:rgba(255,255,255,.92); outline:none; }
+    #chatInput:focus { background:#fff; box-shadow:0 0 0 2px #3b82f6; }
+    #chatSend { padding:0 14px; border:0; border-radius:10px; background:#3b82f6; color:#fff;
+                font-size:15px; cursor:pointer; }
+
+    #nameMenu { position:fixed; inset:0; z-index:100; display:none; align-items:center;
+                justify-content:center; background:rgba(10,15,25,.82); }
+    #nameMenu.open { display:flex; }
+    #nameForm { background:#fff; border-radius:16px; padding:26px 24px; width:min(340px, 88%);
+                text-align:center; box-shadow:0 10px 40px rgba(0,0,0,.5); }
+    #nameForm h2 { margin:0 0 6px; font-size:22px; }
+    #nameForm p { margin:0 0 16px; color:#555; font-size:14px; }
+    #nameInput { width:100%; box-sizing:border-box; padding:12px; font-size:18px; text-align:center;
+                 border:2px solid #ccc; border-radius:10px; outline:none; }
+    #nameInput:focus { border-color:#3b82f6; }
+    #nameError { min-height:20px; margin:6px 0 4px; color:#d33; font-size:13px; }
+    #nameForm button { width:100%; padding:12px; border:0; border-radius:10px; font-size:16px; cursor:pointer; }
+    #nameStart { background:#3b82f6; color:#fff; }
+    #nameCancel { background:#eee; margin-top:8px; display:none; }
+
+    @media (max-width: 600px) {
+      #chatBox { left:16px; right:16px; width:auto; bottom:196px; }
+      #topbar .tx, #hint { display:none; }
+      #topbar button { padding:9px 10px; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="nameMenu">
+    <form id="nameForm" autocomplete="off">
+      <h2>Selamat datang! 👋</h2>
+      <p>Siapa nama karakter Anda?</p>
+      <input id="nameInput" type="text" placeholder="Ketik nama…" maxlength="16">
+      <div id="nameError"></div>
+      <button id="nameStart" type="submit">Mulai Main</button>
+      <button id="nameCancel" type="button">Batal</button>
+    </form>
+  </div>
+
+  <div id="info">
+    <div id="hint">WASD / Panah = bergerak &nbsp;|&nbsp; Enter = chat</div>
+    <div id="netStatus">🟡 Menghubungkan…</div>
+    <div id="audioHint">🎵 Klik atau tekan tombol apa saja untuk menyalakan suara</div>
+  </div>
+
+  <div id="topbar">
+    <button id="btnMusic" title="Musik latar"><span>🎵</span><span class="tx"> Musik</span></button>
+    <button id="btnSfx" title="Efek suara langkah"><span>👣</span><span class="tx"> Efek</span></button>
+    <button id="btnName" title="Ganti nama karakter"><span>✏️</span><span class="tx"> Nama</span></button>
+    <button id="btnCostume" title="Ganti kostum"><span>👕</span><span class="tx"> Kostum</span></button>
+  </div>
+
+  <div id="panel">
+    <h3>Kostum Karakter</h3>
+    <canvas id="preview" width="112" height="112"></canvas>
+    <div id="rows"></div>
+    <button id="btnRandom">🎲 Acak</button>
+    <button id="btnReset">Kembalikan awal</button>
+  </div>
+
+  <form id="chatBox" autocomplete="off">
+    <input id="chatInput" type="text" maxlength="80" placeholder="Ketik pesan, tekan Enter…">
+    <button id="chatSend" type="submit">Kirim</button>
+  </form>
+
+  <div id="dpad">
+    <button class="up" data-dir="up">▲</button>
+    <button class="left" data-dir="left">◀</button>
+    <button class="right" data-dir="right">▶</button>
+    <button class="down" data-dir="down">▼</button>
+  </div>
+  <script src="game.js"></script>
+</body>
+</html>
