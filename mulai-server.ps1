@@ -2,6 +2,17 @@ $ErrorActionPreference = "Continue"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $root
 
+function Buat-DaftarKarakter {
+    # Membuat assets\body\daftar.json (daftar nama folder karakter) sebagai cadangan
+    # untuk game di GitHub Pages bila pembacaan folder lewat API GitHub gagal.
+    $dir = Join-Path $root "assets\body"
+    if (-not (Test-Path $dir)) { return }
+    $names = @(Get-ChildItem $dir -Directory | Sort-Object Name | ForEach-Object { $_.Name })
+    $json = ConvertTo-Json -InputObject $names -Compress
+    [IO.File]::WriteAllText((Join-Path $dir "daftar.json"), $json, (New-Object Text.UTF8Encoding($false)))
+    Write-Host ("Daftar karakter: " + ($names -join ", "))
+}
+
 $origin = "https://jabalrah.github.io"
 $log    = Join-Path $env:TEMP "cloudflared-game.log"
 $logOut = Join-Path $env:TEMP "cloudflared-game-out.log"
@@ -51,17 +62,21 @@ if (-not $url) {
 $wss = $url -replace '^https://', 'wss://'
 Write-Host "Alamat server: $wss"
 
-Write-Host "5/5 Memperbarui game.js dan mengirim ke GitHub..."
+Write-Host "5/5 Memperbarui game.js dan daftar karakter, lalu mengirim ke GitHub..."
+Buat-DaftarKarakter
 $file = Join-Path $root "game.js"
 $old  = [IO.File]::ReadAllText($file)
 $new  = [regex]::Replace($old, 'serverUrl:\s*"[^"]*"', ('serverUrl: "' + $wss + '"'))
 if ($new -ne $old) {
     [IO.File]::WriteAllText($file, $new, (New-Object Text.UTF8Encoding($false)))
-    git add game.js
-    git commit -m "Update alamat server"
+}
+git add game.js assets/body/daftar.json
+git diff --cached --quiet
+if ($LASTEXITCODE -ne 0) {
+    git commit -m "Update alamat server dan daftar karakter"
     git push
 } else {
-    Write-Host "Alamat sama seperti sebelumnya, tidak perlu dikirim."
+    Write-Host "Tidak ada perubahan yang perlu dikirim."
 }
 
 Write-Host ""

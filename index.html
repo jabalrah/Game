@@ -2,49 +2,69 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#111111">
   <title>Game 2D Pertamaku</title>
   <style>
+    :root { --sat:env(safe-area-inset-top,0px); --sar:env(safe-area-inset-right,0px);
+            --sab:env(safe-area-inset-bottom,0px); --sal:env(safe-area-inset-left,0px); --dp:56px; }
     html, body { margin:0; height:100%; overflow:hidden; background:#111; touch-action:none;
+                 overscroll-behavior:none; -webkit-tap-highlight-color:transparent;
                  font-family:system-ui, sans-serif; }
-    canvas#game { display:block; width:100%; height:100%; }
+    body { height:100vh; height:100dvh; }
+    canvas#game { display:block; width:100%; height:100%; -webkit-user-select:none; user-select:none; }
 
-    #info { position:fixed; top:8px; left:8px; display:flex; flex-direction:column;
-            gap:4px; align-items:flex-start; pointer-events:none; }
+    #info { position:fixed; top:calc(8px + var(--sat)); left:calc(8px + var(--sal)); display:flex;
+            flex-direction:column; gap:4px; align-items:flex-start; pointer-events:none;
+            -webkit-user-select:none; user-select:none; }
     #info div { color:#fff; font-size:13px; background:rgba(0,0,0,.45);
                 padding:4px 8px; border-radius:6px; }
 
-    #topbar { position:fixed; top:8px; right:8px; display:flex; gap:6px; }
+    #topbar { position:fixed; top:calc(8px + var(--sat)); right:calc(8px + var(--sar)); display:flex; gap:6px;
+              -webkit-user-select:none; user-select:none; }
     #topbar button { padding:10px 12px; border:0; border-radius:10px; background:#fff;
-                     font-size:15px; cursor:pointer; }
+                     font-size:15px; cursor:pointer; touch-action:manipulation; }
     #topbar button.off { background:#bbb; color:#555; }
     #topbar button.off .tx { text-decoration:line-through; }
 
-    #dpad { position:fixed; left:16px; bottom:16px; display:grid;
-            grid-template-columns:repeat(3,56px); grid-template-rows:repeat(3,56px); gap:6px;
-            opacity:.6; user-select:none; -webkit-user-select:none; }
-    #dpad button { border:0; border-radius:12px; background:#fff; font-size:22px; touch-action:none; }
+    #dpad { position:fixed; left:calc(14px + var(--sal)); bottom:calc(14px + var(--sab)); display:grid;
+            grid-template-columns:repeat(3,var(--dp)); grid-template-rows:repeat(3,var(--dp)); gap:6px;
+            opacity:.6; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+    #dpad button { border:0; border-radius:12px; background:#fff; font-size:22px; touch-action:none;
+                   -webkit-user-select:none; user-select:none; }
+    #dpad button:active { background:#ffd93d; }
     #dpad .up{grid-column:2;grid-row:1} #dpad .left{grid-column:1;grid-row:2}
     #dpad .right{grid-column:3;grid-row:2} #dpad .down{grid-column:2;grid-row:3}
 
-    #panel { position:fixed; top:56px; right:8px; width:290px; max-height:calc(100% - 72px);
-             overflow-y:auto; background:#fff; border-radius:14px; padding:14px;
-             box-shadow:0 6px 24px rgba(0,0,0,.4); display:none; touch-action:pan-y; }
+    #settingsMenu { position:fixed; top:calc(56px + var(--sat)); right:calc(8px + var(--sar)); z-index:20;
+                    display:none; flex-direction:column; gap:6px; min-width:180px; background:#fff;
+                    border-radius:14px; padding:12px; box-shadow:0 6px 24px rgba(0,0,0,.4); }
+    #settingsMenu.open { display:flex; }
+    #settingsMenu .smTitle { font-size:15px; font-weight:700; margin:0 2px 4px; }
+    #settingsMenu button { padding:10px 12px; border:0; border-radius:10px; background:#f1f1f1;
+                           font-size:15px; text-align:left; cursor:pointer; touch-action:manipulation; }
+    #settingsMenu button.off { background:#bbb; color:#555; }
+    #settingsMenu button.off .tx { text-decoration:line-through; }
+
+    #panel { z-index:10; position:fixed; top:calc(56px + var(--sat)); right:calc(8px + var(--sar)); width:290px;
+             max-height:calc(100% - 72px - var(--sat)); overflow-y:auto; background:#fff; border-radius:14px;
+             padding:14px; box-shadow:0 6px 24px rgba(0,0,0,.4); display:none; touch-action:pan-y;
+             overscroll-behavior:contain; }
     #panel.open { display:block; }
     #panel h3 { margin:0 0 8px; font-size:16px; }
-    #preview { display:block; margin:0 auto 10px; background:#7fae73; border-radius:10px; }
+    #preview { display:block; margin:0 auto 10px; background:#fff; border:1px solid #ddd; border-radius:10px; }
     .row { display:flex; align-items:center; gap:6px; margin:8px 0; }
     .row .label { width:62px; font-size:13px; color:#444; }
     .row .name { flex:1; text-align:center; font-size:14px; }
     .row button { width:30px; height:30px; border:1px solid #ccc; border-radius:8px;
-                  background:#f5f5f5; cursor:pointer; }
+                  background:#f5f5f5; cursor:pointer; touch-action:manipulation; }
     .row input[type=color] { width:36px; height:30px; padding:0; border:1px solid #ccc;
                              border-radius:8px; background:none; cursor:pointer; }
     .swatches { display:flex; gap:6px; flex:1; flex-wrap:wrap; }
     .swatches span { width:22px; height:22px; border-radius:50%; border:2px solid #fff;
                      outline:1px solid #bbb; cursor:pointer; }
     #btnRandom, #btnReset { margin-top:8px; padding:8px; width:100%; border:1px solid #ccc;
-                            border-radius:8px; background:#f5f5f5; cursor:pointer; }
+                            border-radius:8px; background:#f5f5f5; cursor:pointer; touch-action:manipulation; }
 
     #chatBox { position:fixed; bottom:16px; right:16px; width:min(340px, calc(100% - 232px));
                display:flex; gap:6px; }
@@ -52,13 +72,17 @@
                  font-size:15px; background:rgba(255,255,255,.92); outline:none; }
     #chatInput:focus { background:#fff; box-shadow:0 0 0 2px #3b82f6; }
     #chatSend { padding:0 14px; border:0; border-radius:10px; background:#3b82f6; color:#fff;
-                font-size:15px; cursor:pointer; }
+                font-size:15px; cursor:pointer; touch-action:manipulation; }
+    #btnChat { display:none; position:fixed; right:calc(14px + var(--sar)); bottom:calc(14px + var(--sab));
+               width:60px; height:60px; border:0; border-radius:50%; background:#3b82f6; color:#fff;
+               font-size:26px; box-shadow:0 4px 14px rgba(0,0,0,.45); z-index:5; touch-action:manipulation; }
 
     #nameMenu { position:fixed; inset:0; z-index:100; display:none; align-items:center;
                 justify-content:center; background:rgba(10,15,25,.82); }
     #nameMenu.open { display:flex; }
     #nameForm { background:#fff; border-radius:16px; padding:26px 24px; width:min(340px, 88%);
-                text-align:center; box-shadow:0 10px 40px rgba(0,0,0,.5); }
+                text-align:center; box-shadow:0 10px 40px rgba(0,0,0,.5);
+                max-height:calc(100dvh - 24px); overflow-y:auto; box-sizing:border-box; }
     #nameForm h2 { margin:0 0 6px; font-size:22px; }
     #nameForm p { margin:0 0 16px; color:#555; font-size:14px; }
     #nameInput { width:100%; box-sizing:border-box; padding:12px; font-size:18px; text-align:center;
@@ -69,10 +93,36 @@
     #nameStart { background:#3b82f6; color:#fff; }
     #nameCancel { background:#eee; margin-top:8px; display:none; }
 
-    @media (max-width: 600px) {
-      #chatBox { left:16px; right:16px; width:auto; bottom:196px; }
+    /* ===== HP (layar sempit) atau HP posisi miring ===== */
+    @media (max-width: 600px), (max-height: 500px) and (pointer: coarse) {
+      :root { --dp:58px; }
+      #info { max-width:calc(100vw - 140px - var(--sal) - var(--sar)); }
+      #info div { font-size:12px; padding:3px 7px; }
       #topbar .tx, #hint { display:none; }
-      #topbar button { padding:9px 10px; }
+      #topbar button { min-width:46px; min-height:46px; padding:0 12px; font-size:18px; }
+      #settingsMenu { top:calc(62px + var(--sat)); min-width:210px; }
+      #settingsMenu button { min-height:48px; font-size:16px; }
+      #panel { top:calc(62px + var(--sat)); width:min(310px, calc(100vw - 16px - var(--sal) - var(--sar)));
+               max-height:calc(100dvh - 78px - var(--sat) - var(--sab)); }
+      .row button { width:40px; height:40px; font-size:16px; }
+      .row input[type=color] { width:44px; height:40px; }
+      .swatches span { width:30px; height:30px; }
+      #btnRandom, #btnReset { padding:12px; font-size:15px; }
+      #dpad { opacity:.7; }
+      #btnChat { display:block; }
+      body.chatOpen #btnChat { display:none; }
+      #chatBox { display:none; top:calc(62px + var(--sat)); bottom:auto; left:calc(8px + var(--sal));
+                 right:calc(8px + var(--sar)); width:auto; z-index:15; }
+      body.chatOpen #chatBox { display:flex; }
+      #chatInput { font-size:16px; padding:12px; }
+      #chatSend { min-width:68px; font-size:16px; }
+    }
+    /* layar pendek (HP miring): tombol arah dan teks lebih kecil */
+    @media (max-height: 500px) {
+      :root { --dp:46px; }
+      #dpad { gap:4px; }
+      #dpad button { font-size:18px; }
+      #info div { font-size:11px; padding:2px 6px; }
     }
   </style>
 </head>
@@ -97,6 +147,11 @@
   </div>
 
   <div id="topbar">
+    <button id="btnSettings" title="Pengaturan"><span>⚙️</span><span class="tx"> Setting</span></button>
+  </div>
+
+  <div id="settingsMenu">
+    <div class="smTitle">⚙️ Setting</div>
     <button id="btnMusic" title="Musik latar"><span>🎵</span><span class="tx"> Musik</span></button>
     <button id="btnSfx" title="Efek suara langkah"><span>👣</span><span class="tx"> Efek</span></button>
     <button id="btnName" title="Ganti nama karakter"><span>✏️</span><span class="tx"> Nama</span></button>
@@ -116,6 +171,8 @@
     <button id="chatSend" type="submit">Kirim</button>
   </form>
 
+  <button id="btnChat" type="button" aria-label="Chat" title="Chat">💬</button>
+
   <div id="dpad">
     <button class="up" data-dir="up">▲</button>
     <button class="left" data-dir="left">◀</button>
@@ -123,6 +180,7 @@
     <button class="down" data-dir="down">▼</button>
   </div>
    <script src="game.js"></script>
+   <script src="ayam.js"></script>
    <script src="minimap.js"></script>
    <script src="local.js"></script>
 </body>
