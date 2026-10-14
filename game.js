@@ -1,6 +1,9 @@
 // ===================== PENGATURAN GAME (silakan ubah) =====================
 const CONFIG = {
-  backgroundImage: "assets/background.png", // ganti dengan gambar latar Anda
+  backgroundImages: ["assets/background1.png", "assets/background2.png", "assets/background3.png"], // 3 frame animasi latar
+  backgroundImage: "assets/background.png", // cadangan: dipakai kalau frame di atas tidak ada
+  backgroundFps: 3,         // kecepatan animasi latar (frame per detik); 0 = tidak beranimasi
+  backgroundColor: "#ffffff", // warna dasar di bawah gambar latar (terlihat di bagian PNG yang bolong/transparan)
   backgroundMode: "tile",   // "tile" = diulang seperti ubin, "stretch" = diregangkan
 
   worldWidth: 3000,         // ukuran peta (piksel). Saat online, ukuran dari server yang dipakai.
@@ -10,9 +13,16 @@ const CONFIG = {
   playerHeight: 96,
   speed: 250,               // kecepatan (piksel per detik)
 
-  frameCount: 5,            // jumlah frame animasi per bagian
-  animationFps: 10,         // kecepatan animasi
-  idleFrame: 0,             // frame saat diam (0 = frame pertama)
+  frameCount: 6,            // jumlah frame animasi tiap karakter (1.png sampai 6.png)
+
+  // Daftar karakter dibaca OTOMATIS dari folder assets/body/ (satu folder = satu karakter).
+  // Isi bodyList hanya jika ingin menentukan sendiri, contoh: ["k1", "baju-merah"]. Kosongkan = otomatis.
+  bodyList: [],
+  fallbackBodies: ["k1", "k2", "k3", "k4"],   // dipakai hanya jika folder gagal dibaca
+  animationFps: 10,         // kecepatan animasi berjalan
+  idleFrameCount: 3,        // jumlah frame animasi diam/idle (idle1.png sampai idle3.png)
+  idleFps: 4,               // kecepatan animasi idle (makin kecil makin pelan)
+  idleFrame: 0,             // dipakai hanya jika karakter TIDAK punya animasi idle (0 = frame jalan pertama)
   spriteFacesRight: true,   // true jika gambar asli menghadap KANAN
 
   chatDuration: 6000,       // lama pesan tampil di atas karakter (milidetik)
@@ -38,47 +48,23 @@ const CONFIG = {
   // Alamat server. Saat tes di komputer sendiri: "ws://localhost:3000"
   // Setelah server di-hosting, ganti dengan alamatnya, contoh: "wss://nama-game.onrender.com"
   // Kosongkan ("") untuk bermain sendiri tanpa server.
-  serverUrl: "wss://return-dns-impose-col.trycloudflare.com",
+  serverUrl: "wss://below-convenience-concerns-personnel.trycloudflare.com",
   sendInterval: 66,         // jeda minimal kirim posisi (milidetik), sekitar 15 kali per detik
   remoteSmoothing: 14       // makin besar, gerak pemain lain makin cepat menyusul posisi terbaru
 };
 
-// ===================== DAFTAR KOSTUM (tambah kostum baru di sini) =====================
-// Lokasi file:  assets/<bagian>/<id>/1.png ... 5.png     (khusus kulit: assets/body/1.png ... 5.png)
-// tint: true  -> gambar digambar abu-abu/putih lalu diwarnai oleh game (ada pemilih warna)
-// tint: false -> gambar dipakai apa adanya (tanpa pemilih warna)
-// id hanya boleh huruf kecil, angka, - dan _ (maks 24 karakter) agar diterima server.
+// ===================== KARAKTER (otomatis dari folder) =====================
+// Menambah karakter TANPA mengedit kode:
+//   1. Buat folder   assets/body/<nama>/
+//   2. Isi dengan    1.png, 2.png, ... 6.png    (frame animasi jalan, ukuran kanvas sama)
+//   3. Selesai. Game membaca daftar folder itu secara otomatis.
+// Nama folder: huruf kecil, angka, - dan _ saja (maks 24 karakter), contoh: baju-merah
+// Karakter yang gambarnya tidak lengkap otomatis dilewati (lihat pesan di Console).
 const PARTS = {
-  body:  { label: "Kulit", flat: true,
-           options: [{ id: "default", name: "Badan", tint: true }] },
-  hat:   { label: "Topi",
-           options: [{ id: "none", name: "Tanpa" },
-                     { id: "cap", name: "Topi Baseball", tint: true },
-                     { id: "beanie", name: "Kupluk", tint: true }] },
-  shirt: { label: "Baju",
-           options: [{ id: "none", name: "Tanpa" },
-                     { id: "tshirt", name: "Kaos", tint: true },
-                     { id: "hoodie", name: "Hoodie", tint: true }] },
-  pants: { label: "Celana",
-           options: [{ id: "none", name: "Tanpa" },
-                     { id: "jeans", name: "Celana Panjang", tint: true },
-                     { id: "shorts", name: "Celana Pendek", tint: true }] },
-  shoes: { label: "Sepatu",
-           options: [{ id: "none", name: "Tanpa" },
-                     { id: "sneakers", name: "Sneakers", tint: true },
-                     { id: "boots", name: "Boots", tint: true }] }
+  body: { label: "Karakter", options: [] }    // options diisi otomatis saat game dimuat
 };
-const DRAW_ORDER = ["body", "pants", "shoes", "shirt", "hat"]; // dari belakang ke depan
-const MENU_ORDER = ["body", "hat", "shirt", "pants", "shoes"];
-const SKIN_PRESETS = ["#ffdbac", "#f1c27d", "#e0ac69", "#c68642", "#8d5524", "#5c3a21"];
-
-const DEFAULT_OUTFIT = {
-  body:  { id: "default",  color: "#f1c27d" },
-  hat:   { id: "cap",      color: "#dd3333" },
-  shirt: { id: "hoodie",   color: "#3b82f6" },
-  pants: { id: "jeans",    color: "#3b4a7a" },
-  shoes: { id: "boots",    color: "#8b5a2b" }
-};
+const MENU_ORDER = ["body"];
+const DEFAULT_OUTFIT = { body: { id: "", color: "#ffffff" } };   // id awal diisi otomatis
 // ==========================================================================
 
 const STORAGE_KEY = "gamePertamaOutfit";
@@ -94,11 +80,11 @@ function resize() {
 window.addEventListener("resize", resize);
 resize();
 
-function loadImage(src) {
+function loadImage(src, quiet) {
   return new Promise(resolve => {
     const img = new Image();
     img.onload = () => resolve(img);
-    img.onerror = () => { console.warn("Gagal memuat:", src); resolve(null); };
+    img.onerror = () => { if (!quiet) console.warn("Gagal memuat:", src); resolve(null); };
     img.src = src;
   });
 }
@@ -133,7 +119,7 @@ function loadOutfit() {
     if (saved) {
       for (const key of Object.keys(PARTS)) {
         const s = saved[key];
-        if (s && PARTS[key].options.some(o => o.id === s.id) && COLOR_RE.test(s.color)) {
+        if (s && typeof s.id === "string" && ID_RE.test(s.id) && COLOR_RE.test(s.color)) {
           result[key] = { id: s.id, color: s.color };
         }
       }
@@ -146,64 +132,143 @@ function saveOutfit() {
 }
 
 let outfit = loadOutfit();
-const images = {};       // images[bagian][id] = [frame1..frame5]
-let composed = [];       // frame jadi milik pemain ini (semua layer sudah digabung)
-let bgImg = null;
+const images = { body: Object.create(null) };   // images.body[id] = { walk: [frame1 ... frame6], idle: [idle1 ... idle3] }
+let composed = { walk: [], idle: [] };   // frame jadi milik pemain ini: jalan + idle
+let bgFrames = [];           // frame animasi latar yang berhasil dimuat
 
-function imagePath(part, id, n) {
-  return PARTS[part].flat ? `assets/${part}/${n}.png` : `assets/${part}/${id}/${n}.png`;
+function imagePath(part, id, n) { return `assets/${part}/${id}/${n}.png`; }
+function idlePath(id, n) { return `assets/body/${id}/idle${n}.png`; }
+
+// ---------- Membaca daftar karakter dari folder assets/body/ ----------
+function prettyName(id) { return id.replace(/[-_]+/g, " ").replace(/\b\w/g, c => c.toUpperCase()); }
+
+// Alamat API GitHub untuk membaca isi folder (dipakai saat game dibuka dari xxx.github.io)
+function githubApiUrl(hostname, pathname) {
+  const owner = hostname.split(".")[0];
+  const repo = pathname.split("/")[1] || hostname;
+  return `https://api.github.com/repos/${owner}/${repo}/contents/assets/body`;
 }
 
-function loadAllCostumeImages() {
-  const jobs = [];
-  for (const part of Object.keys(PARTS)) {
-    images[part] = Object.create(null);
-    for (const opt of PARTS[part].options) {
-      if (opt.id === "none") continue;
-      images[part][opt.id] = [];
-      for (let n = 1; n <= CONFIG.frameCount; n++) {
-        jobs.push(loadImage(imagePath(part, opt.id, n)).then(img => { images[part][opt.id][n - 1] = img; }));
-      }
-    }
+// Membaca halaman daftar folder dari server web lokal (http-server, Live Server, dll.)
+function parseDirectoryListing(html, baseUrl) {
+  const base = new URL(baseUrl);
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const names = [];
+  for (const a of doc.querySelectorAll("a[href]")) {
+    let u;
+    try { u = new URL(a.getAttribute("href"), base); } catch (e) { continue; }
+    if (u.origin !== base.origin || !u.pathname.startsWith(base.pathname)) continue;
+    const m = /^([^/]+)\/$/.exec(u.pathname.slice(base.pathname.length));
+    if (m) names.push(decodeURIComponent(m[1]));
   }
-  return Promise.all(jobs);
+  return names;
 }
 
-// ---------- Mewarnai (tinting) ----------
-function tintImage(img, color) {
-  const c = document.createElement("canvas");
-  c.width = img.width; c.height = img.height;
-  const g = c.getContext("2d");
-  g.drawImage(img, 0, 0);
-  g.globalCompositeOperation = "multiply";
-  g.fillStyle = color;
-  g.fillRect(0, 0, c.width, c.height);
-  g.globalCompositeOperation = "destination-in"; // buang area di luar bentuk asli
-  g.drawImage(img, 0, 0);
-  return c;
+const BODIES_CACHE_KEY = "gamePertamaBodies";
+const BODIES_CACHE_MS = 2 * 60 * 1000;     // API GitHub dibatasi 60 permintaan per jam per IP
+function readBodiesCache() {
+  try {
+    const c = JSON.parse(localStorage.getItem(BODIES_CACHE_KEY) || "null");
+    if (c && Array.isArray(c.list)) return c;
+  } catch (e) {}
+  return null;
 }
 
-// ---------- Gabungkan semua layer menjadi frame jadi ----------
+async function namesFromGithub() {
+  const c = readBodiesCache();
+  if (c && Date.now() - c.t < BODIES_CACHE_MS && c.list.length) return c.list;
+  const res = await fetch(githubApiUrl(location.hostname, location.pathname));
+  if (!res.ok) throw new Error("GitHub API " + res.status);
+  const list = (await res.json()).filter(x => x && x.type === "dir").map(x => x.name);
+  try { localStorage.setItem(BODIES_CACHE_KEY, JSON.stringify({ t: Date.now(), list })); } catch (e) {}
+  return list;
+}
+async function namesFromDirectory() {
+  const base = new URL("assets/body/", location.href);
+  const res = await fetch(base, { cache: "no-store" });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  return parseDirectoryListing(await res.text(), base.href);
+}
+async function namesFromManifest() {            // cadangan: assets/body/daftar.json (dibuat oleh skrip)
+  const res = await fetch("assets/body/daftar.json", { cache: "no-cache" });
+  if (!res.ok) throw new Error("daftar.json " + res.status);
+  const list = await res.json();
+  return Array.isArray(list) ? list.filter(x => typeof x === "string") : [];
+}
+
+async function discoverBodyNames() {
+  if (CONFIG.bodyList && CONFIG.bodyList.length) return CONFIG.bodyList.slice();
+  const sources = [location.hostname.endsWith(".github.io") ? namesFromGithub : namesFromDirectory, namesFromManifest];
+  for (const source of sources) {
+    try {
+      const names = await source();
+      if (names && names.length) return names;
+    } catch (e) { console.warn("Daftar karakter tidak bisa dibaca dari " + source.name + ":", e.message || e); }
+  }
+  const c = readBodiesCache();                  // terakhir: daftar tersimpan, lalu daftar bawaan
+  if (c && c.list.length) return c.list;
+  return CONFIG.fallbackBodies.slice();
+}
+
+// ---------- Memuat gambar karakter ----------
+const bodyLoads = new Map();                    // id -> Promise<boolean>
+function addBodyOption(id) {
+  const opts = PARTS.body.options;
+  if (opts.some(o => o.id === id)) return;
+  opts.push({ id, name: prettyName(id) });
+  opts.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+}
+function loadBody(id) {
+  if (bodyLoads.has(id)) return bodyLoads.get(id);
+  const walkJobs = [], idleJobs = [];
+  for (let n = 1; n <= CONFIG.frameCount; n++) walkJobs.push(loadImage(imagePath("body", id, n)));
+  for (let n = 1; n <= CONFIG.idleFrameCount; n++) idleJobs.push(loadImage(idlePath(id, n), true));   // idle boleh tidak ada
+  const p = Promise.all([Promise.all(walkJobs), Promise.all(idleJobs)]).then(([walk, idleAll]) => {
+    if (!walk.every(Boolean)) {
+      console.warn(`Karakter "${id}" dilewati: harus ada ${CONFIG.frameCount} gambar jalan (1.png sampai ${CONFIG.frameCount}.png).`);
+      return false;
+    }
+    let idle = [];
+    if (idleAll.every(Boolean)) idle = idleAll;
+    else if (idleAll.some(Boolean)) {
+      console.warn(`Animasi idle karakter "${id}" tidak dipakai: harus lengkap idle1.png sampai idle${CONFIG.idleFrameCount}.png.`);
+    }
+    images.body[id] = { walk, idle };
+    addBodyOption(id);
+    return true;
+  });
+  bodyLoads.set(id, p);
+  return p;
+}
+async function loadAllBodies() {
+  const names = await discoverBodyNames();
+  const valid = [];
+  for (const name of names) {
+    if (ID_RE.test(name)) valid.push(name);
+    else console.warn(`Folder "${name}" dilewati: pakai huruf kecil, angka, - atau _ saja (maks 24 karakter).`);
+  }
+  await Promise.all(valid.map(loadBody));
+}
+
+// Karakter pemain lain yang belum kita punya: muat sekarang, lalu perbarui tampilannya
+function prepareOutfit(o) {
+  if (images.body[o.body.id]) return;
+  loadBody(o.body.id).then(ok => {
+    if (!ok) return;
+    frameCache.clear();
+    for (const r of remotePlayers.values()) r.frames = composeCached(r.outfit);
+    buildPanel();
+  });
+}
+
+// ---------- Frame jadi ----------
+// Hasilnya { walk: [frame jalan], idle: [frame diam] }. Karakter sudah berisi baju, celana, dan sepatu.
+// Jika karakter yang diminta tidak ada, pakai karakter lain yang tersedia.
 function composeOutfit(o) {
-  const base = (images.body.default || []).find(Boolean);
-  if (!base) return [];
-  const out = [];
-  for (let i = 0; i < CONFIG.frameCount; i++) {
-    const c = document.createElement("canvas");
-    c.width = base.width; c.height = base.height;
-    const g = c.getContext("2d");
-    for (const part of DRAW_ORDER) {
-      const sel = o[part];
-      if (!sel || sel.id === "none") continue;
-      const set = images[part] && images[part][sel.id];
-      const img = set && set[i];
-      if (!img) continue;                       // kostum tidak dikenal: dilewati
-      const opt = PARTS[part].options.find(x => x.id === sel.id);
-      g.drawImage(!opt || opt.tint !== false ? tintImage(img, sel.color) : img, 0, 0);
-    }
-    out.push(c);
-  }
-  return out;
+  const own = o.body && images.body[o.body.id];
+  if (own) return own;
+  const first = Object.keys(images.body)[0];
+  return first ? images.body[first] : { walk: [], idle: [] };
 }
 function composeFrames() { composed = composeOutfit(outfit); }
 
@@ -225,7 +290,8 @@ const pctx = preview.getContext("2d");
 
 function refreshPreview() {
   pctx.clearRect(0, 0, preview.width, preview.height);
-  if (composed[0]) pctx.drawImage(composed[0], 0, 0, preview.width, preview.height);
+  const f = composed.idle[0] || composed.walk[Math.min(CONFIG.idleFrame, composed.walk.length - 1)];
+  if (f) pctx.drawImage(f, 0, 0, preview.width, preview.height);
 }
 function applyOutfit() {
   composeFrames();
@@ -237,63 +303,33 @@ function applyOutfit() {
 
 function buildPanel() {
   rowsEl.innerHTML = "";
-  for (const part of MENU_ORDER) {
-    const def = PARTS[part];
-    const sel = outfit[part];
-    const opt = def.options.find(o => o.id === sel.id);
-    const row = document.createElement("div");
-    row.className = "row";
+  const def = PARTS.body;
+  if (!def.options.length) return;
+  let idx = def.options.findIndex(o => o.id === outfit.body.id);
+  if (idx < 0) idx = 0;
+  const opt = def.options[idx];
 
-    const label = document.createElement("div");
-    label.className = "label"; label.textContent = def.label;
-    row.appendChild(label);
-
-    if (part === "body") {
-      const sw = document.createElement("div");
-      sw.className = "swatches";
-      for (const col of SKIN_PRESETS) {
-        const s = document.createElement("span");
-        s.style.background = col;
-        s.title = col;
-        s.onclick = () => { outfit.body.color = col; applyOutfit(); };
-        sw.appendChild(s);
-      }
-      row.appendChild(sw);
-    } else {
-      const idx = def.options.indexOf(opt);
-      const step = d => {
-        const n = def.options.length;
-        outfit[part].id = def.options[(idx + d + n) % n].id;
-        applyOutfit();
-      };
-      const prev = document.createElement("button"); prev.textContent = "◀"; prev.onclick = () => step(-1);
-      const name = document.createElement("div"); name.className = "name"; name.textContent = opt.name;
-      const next = document.createElement("button"); next.textContent = "▶"; next.onclick = () => step(1);
-      row.append(prev, name, next);
-    }
-
-    if (opt.id !== "none" && opt.tint !== false) {
-      const input = document.createElement("input");
-      input.type = "color"; input.value = sel.color;
-      input.oninput = () => {            // ubah warna langsung terlihat, tanpa membangun ulang menu
-        outfit[part].color = input.value;
-        composeFrames(); refreshPreview(); saveOutfit(); netSendOutfit();
-      };
-      row.appendChild(input);
-    }
-    rowsEl.appendChild(row);
-  }
+  const row = document.createElement("div");
+  row.className = "row";
+  const label = document.createElement("div");
+  label.className = "label"; label.textContent = def.label;
+  const step = d => {
+    const n = def.options.length;
+    outfit.body.id = def.options[(idx + d + n) % n].id;
+    applyOutfit();
+  };
+  const prev = document.createElement("button"); prev.textContent = "◀"; prev.onclick = () => step(-1);
+  const name = document.createElement("div"); name.className = "name"; name.textContent = opt.name;
+  const next = document.createElement("button"); next.textContent = "▶"; next.onclick = () => step(1);
+  row.append(label, prev, name, next);
+  rowsEl.appendChild(row);
 }
 
 document.getElementById("btnCostume").onclick = () => panel.classList.toggle("open");
 document.getElementById("btnReset").onclick = () => { outfit = cloneOutfit(DEFAULT_OUTFIT); applyOutfit(); };
 document.getElementById("btnRandom").onclick = () => {
-  const rnd = a => a[Math.floor(Math.random() * a.length)];
-  const rndColor = () => "#" + [0, 0, 0].map(() => Math.floor(Math.random() * 200 + 40).toString(16).padStart(2, "0")).join("");
-  for (const part of MENU_ORDER) {
-    if (part !== "body") outfit[part].id = rnd(PARTS[part].options).id;
-    outfit[part].color = part === "body" ? rnd(SKIN_PRESETS) : rndColor();
-  }
+  const opts = PARTS.body.options;
+  outfit.body.id = opts[Math.floor(Math.random() * opts.length)].id;
   applyOutfit();
 };
 
@@ -608,6 +644,87 @@ let lastSent = null;
 let sendTimer = 0;
 let outfitSendTimer = null;
 
+// ---------- Papan skor (semua pemain online) ----------
+// jumlah baris papan skor menyesuaikan ukuran layar
+function boardMaxRows() {
+  if (window.innerHeight <= 500) return 3;
+  if (window.innerWidth <= 600) return 5;
+  return 10;
+}
+const boardStyle = document.createElement("style");
+boardStyle.textContent = `
+#scoreBoard{position:fixed;left:calc(8px + env(safe-area-inset-left,0px));width:210px;box-sizing:border-box;background:rgba(0,0,0,.55);color:#fff;
+  border-radius:10px;padding:8px 10px;font-size:13px;pointer-events:none;z-index:5;display:none}
+#scoreBoard .sbTitle{font-weight:700;margin-bottom:4px}
+#scoreBoard .sbRow{display:grid;grid-template-columns:28px 1fr auto;gap:6px;padding:2px 4px;border-radius:6px;align-items:center}
+#scoreBoard .sbRow.me{background:rgba(59,130,246,.6);font-weight:700}
+#scoreBoard .sbRank{text-align:center}
+#scoreBoard .sbRow.r1{font-size:15px;color:#ffd54a}
+#scoreBoard .sbRow.r2{color:#e0e0e0}
+#scoreBoard .sbRow.r3{color:#e8a56a}
+#scoreBoard .sbName{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#scoreBoard .sbMore{opacity:.7;padding:2px 4px}
+@media (max-width:600px){#scoreBoard{width:158px;font-size:12px;padding:6px 8px}
+  #scoreBoard .sbRow{grid-template-columns:24px 1fr auto;gap:4px}}
+@media (max-height:500px){#scoreBoard{font-size:11px;padding:5px 7px}}`;
+document.head.appendChild(boardStyle);
+const boardEl = document.createElement("div");
+boardEl.id = "scoreBoard";
+document.body.appendChild(boardEl);
+let boardKey = "";
+
+function renderBoard() {
+  if (!netReady) { boardEl.style.display = "none"; boardKey = ""; return; }
+  const infoEl = document.getElementById("info");
+  boardEl.style.top = ((infoEl ? infoEl.getBoundingClientRect().bottom : 0) + 6) + "px";
+  boardEl.style.display = "block";
+
+  const all = [{ id: myId, name: playerName, score: typeof Ayam !== "undefined" ? Ayam.caught : 0, me: true }];
+  remotePlayers.forEach(r => all.push({ id: r.id, name: r.name, score: r.score || 0, me: false }));
+  all.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name) || a.id - b.id);
+  let rank = 0, prev = null;                       // skor sama = peringkat sama
+  all.forEach((p, i) => { if (p.score !== prev) { rank = i + 1; prev = p.score; } p.rank = rank; });
+
+  const maxRows = boardMaxRows();
+  let shown = all.slice(0, maxRows);
+  if (all.length > maxRows && !shown.some(p => p.me)) {   // pastikan baris saya selalu terlihat
+    shown = all.slice(0, maxRows - 1);
+    shown.push(all.find(p => p.me));
+  }
+  const hidden = all.length - shown.length;
+  const key = JSON.stringify([shown.map(p => [p.rank, p.name, p.score, p.me]), hidden]);
+  if (key === boardKey) return;                    // tidak ada perubahan
+  boardKey = key;
+
+  boardEl.textContent = "";
+  const title = document.createElement("div");
+  title.className = "sbTitle";
+  title.textContent = "🏆 Papan Skor";
+  boardEl.appendChild(title);
+  const medals = ["🥇", "🥈", "🥉"];
+  for (const p of shown) {
+    const row = document.createElement("div");
+    row.className = "sbRow" + (p.me ? " me" : "") + (p.score > 0 && p.rank <= 3 ? " r" + p.rank : "");
+    const r = document.createElement("span");
+    r.className = "sbRank";
+    r.textContent = p.score > 0 && p.rank <= 3 ? medals[p.rank - 1] : p.rank + ".";
+    const n = document.createElement("span");
+    n.className = "sbName";
+    n.textContent = p.name + (p.me ? " (Anda)" : "");
+    const s = document.createElement("span");
+    s.textContent = "🐔 " + p.score;
+    row.append(r, n, s);
+    boardEl.appendChild(row);
+  }
+  if (hidden > 0) {
+    const more = document.createElement("div");
+    more.className = "sbMore";
+    more.textContent = "… dan " + hidden + " pemain lain";
+    boardEl.appendChild(more);
+  }
+}
+setInterval(renderBoard, 300);
+
 function updateNetStatus() {
   let text;
   if (!CONFIG.serverUrl) text = "👤 Mode sendiri (offline)";
@@ -657,6 +774,7 @@ function netConnect() {
     netReady = false;
     myId = null;
     remotePlayers.clear();
+    if (typeof Ayam !== "undefined") Ayam.leaveServer();
     if (!netNote) netNote = "Tidak terhubung ke server";
     updateNetStatus();
     scheduleReconnect();
@@ -669,10 +787,12 @@ function addRemote(p) {
   const o = validOutfit(p.outfit);
   const name = cleanName(p.name);
   if (!o || !name) return;
+  prepareOutfit(o);
   const x = Number.isFinite(p.x) ? p.x : 0, y = Number.isFinite(p.y) ? p.y : 0;
   remotePlayers.set(p.id, {
     id: p.id, name, outfit: o, frames: composeCached(o),
-    x, y, tx: x, ty: y, left: !!p.l, moving: !!p.m, animTime: 0, chat: null
+    x, y, tx: x, ty: y, left: !!p.l, moving: !!p.m, wasMoving: !!p.m, animTime: 0, chat: null,
+    score: Number.isFinite(p.s) ? p.s : 0
   });
 }
 
@@ -688,11 +808,21 @@ function handleNetMessage(msg) {
       }
       remotePlayers.clear();
       if (Array.isArray(msg.players)) msg.players.forEach(addRemote);
+      if (typeof Ayam !== "undefined") Ayam.setFromServer(msg.chickens);   // ayam dari server (ayam.js)
       netReady = true;
       netNote = "";
       reconnectDelay = 1000;
       lastSent = null;
       updateNetStatus();
+      break;
+    }
+    case "ck": if (typeof Ayam !== "undefined") Ayam.applyServer(msg.c); break;
+    case "caught": {
+      if (msg.by !== myId) {                                  // pemain lain menangkap: catat skornya
+        const r = remotePlayers.get(msg.by);
+        if (r && Number.isFinite(msg.score)) r.score = msg.score;
+      }
+      if (typeof Ayam !== "undefined") Ayam.onCaught(msg, myId);
       break;
     }
     case "join": addRemote(msg.player); updateNetStatus(); break;
@@ -714,7 +844,7 @@ function handleNetMessage(msg) {
     }
     case "outfit": {
       const r = remotePlayers.get(msg.id), o = validOutfit(msg.outfit);
-      if (r && o) { r.outfit = o; r.frames = composeCached(o); }
+      if (r && o) { prepareOutfit(o); r.outfit = o; r.frames = composeCached(o); }
       break;
     }
     case "name": {
@@ -741,13 +871,16 @@ function update(dt) {
   if (keys.ArrowRight || keys.KeyD || touch.right) dx += 1;
   if (keys.ArrowUp || keys.KeyW || touch.up) dy -= 1;
   if (keys.ArrowDown || keys.KeyS || touch.down) dy += 1;
+  if (typeof Ayam !== "undefined" && Ayam.frozen) { dx = 0; dy = 0; }   // jeda setelah menangkap ayam (ayam.js)
 
   if (dx !== 0 && dy !== 0) { dx *= Math.SQRT1_2; dy *= Math.SQRT1_2; }
   if (dx < 0) player.facingLeft = true;
   if (dx > 0) player.facingLeft = false;
 
+  const wasMoving = player.moving;
   player.moving = (dx !== 0 || dy !== 0);
-  if (player.moving) animTime += dt; else animTime = 0;
+  if (player.moving !== wasMoving) animTime = 0;   // ganti dari diam ke jalan (atau sebaliknya): animasi mulai dari awal
+  animTime += dt;
 
   const oldX = player.x, oldY = player.y;
   player.x += dx * CONFIG.speed * dt;
@@ -783,13 +916,25 @@ function update(dt) {
   for (const r of remotePlayers.values()) {
     if (Math.abs(r.tx - r.x) > 400 || Math.abs(r.ty - r.y) > 400) { r.x = r.tx; r.y = r.ty; }
     else { r.x += (r.tx - r.x) * a; r.y += (r.ty - r.y) * a; }
-    if (r.moving) r.animTime += dt; else r.animTime = 0;
+    if (r.moving !== r.wasMoving) { r.animTime = 0; r.wasMoving = r.moving; }
+    r.animTime += dt;
   }
+
+  if (typeof Ayam !== "undefined") Ayam.update(dt);   // gerakkan ayam & cek tangkapan (ayam.js)
 }
 
 // ---------- Gambar ----------
+function currentBg() {
+  const n = bgFrames.length;
+  if (!n) return null;
+  if (n === 1 || !CONFIG.backgroundFps) return bgFrames[0];
+  return bgFrames[Math.floor(performance.now() / 1000 * CONFIG.backgroundFps) % n];
+}
 function drawBackground(camX, camY, viewW, viewH) {
+  const bgImg = currentBg();
   if (!bgImg) { ctx.fillStyle = "#5a8f55"; ctx.fillRect(0, 0, viewW, viewH); return; }
+  ctx.fillStyle = CONFIG.backgroundColor;      // warna dasar: terlihat di bagian gambar yang transparan
+  ctx.fillRect(0, 0, viewW, viewH);
   if (CONFIG.backgroundMode === "stretch") {
     ctx.drawImage(bgImg, -camX, -camY, CONFIG.worldWidth, CONFIG.worldHeight);
     return;
@@ -804,11 +949,12 @@ function drawBackground(camX, camY, viewW, viewH) {
 
 function drawSprite(c, px, py) {
   const w = CONFIG.playerWidth, h = CONFIG.playerHeight;
-  const n = c.frames.length;
+  const set = c.frames, n = set.walk.length;
   if (!n) { ctx.fillStyle = "#e33"; ctx.fillRect(px - w / 2, py - h / 2, w, h); return; }
-  const frame = c.frames[c.moving
-      ? Math.floor(c.animTime * CONFIG.animationFps) % n
-      : Math.min(CONFIG.idleFrame, n - 1)];
+  let frame;
+  if (c.moving) frame = set.walk[Math.floor(c.animTime * CONFIG.animationFps) % n];
+  else if (set.idle.length) frame = set.idle[Math.floor(c.animTime * CONFIG.idleFps) % set.idle.length];
+  else frame = set.walk[Math.min(CONFIG.idleFrame, n - 1)];
   ctx.save();
   ctx.translate(px, py);
   const needFlip = CONFIG.spriteFacesRight ? c.left : !c.left;
@@ -839,13 +985,14 @@ function draw() {
   const list = [{ x: player.x, y: player.y, frames: composed, left: player.facingLeft,
                   moving: player.moving, animTime, name: playerName, chat: chatMessage }];
   for (const r of remotePlayers.values()) list.push(r);
+  if (typeof Ayam !== "undefined") Ayam.addToDrawList(list);   // ayam + pose menang (ayam.js)
   list.sort((a, b) => a.y - b.y);
 
   const margin = 120, visible = [];
   for (const c of list) {
     const px = c.x - camX, py = c.y - camY;
     if (px < -margin || px > viewW + margin || py < -margin || py > viewH + margin) continue;
-    drawSprite(c, px, py);
+    if (c.customDraw) c.customDraw(px, py); else drawSprite(c, px, py);
     visible.push({ c, px, py });
   }
   for (const v of visible) drawNameTag(v.px, v.py, v.c.name);                     // nama di atas semua karakter
@@ -861,8 +1008,32 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 
-Promise.all([loadAllCostumeImages(), loadImage(CONFIG.backgroundImage)]).then(([, b]) => {
-  bgImg = b;
+function showNoCharacters() {
+  const d = document.createElement("div");
+  d.style.cssText = "position:fixed;inset:0;display:flex;align-items:center;justify-content:center;" +
+    "text-align:center;padding:24px;background:#222;color:#fff;font:16px system-ui,sans-serif;z-index:200";
+  d.textContent = "Tidak ada karakter. Buat folder assets/body/<nama>/ berisi 1.png sampai " +
+    CONFIG.frameCount + ".png, lalu muat ulang.";
+  document.body.appendChild(d);
+}
+
+async function loadBackgrounds() {
+  const imgs = (await Promise.all(CONFIG.backgroundImages.map(src => loadImage(src, true)))).filter(Boolean);
+  if (imgs.length) return imgs;
+  const single = await loadImage(CONFIG.backgroundImage, true);   // cadangan: satu gambar latar
+  return single ? [single] : [];
+}
+
+Promise.all([loadAllBodies(), loadBackgrounds()]).then(([, bgs]) => {
+  bgFrames = bgs;
+  if (!bgFrames.length) console.warn("Gambar latar tidak ditemukan (assets/background1.png ... 3.png atau assets/background.png)");
+  const opts = PARTS.body.options;
+  if (!opts.length) { showNoCharacters(); return; }
+  DEFAULT_OUTFIT.body.id = opts[0].id;
+  if (!opts.some(o => o.id === outfit.body.id)) {       // pilihan tersimpan sudah tidak ada
+    outfit.body = { id: opts[0].id, color: "#ffffff" };
+    saveOutfit();
+  }
   composeFrames();
   refreshPreview();
   buildPanel();
@@ -871,3 +1042,44 @@ Promise.all([loadAllCostumeImages(), loadImage(CONFIG.backgroundImage)]).then(([
   else netConnect();                   // sudah punya nama: langsung masuk ke server
   requestAnimationFrame(loop);
 });
+
+// ---------- Menu Setting (Musik, Efek, Nama, Kostum dikumpulkan di satu menu) ----------
+// Menu Setting dan panel Kostum menutup sendiri saat klik di luar, karakter bergerak, atau Esc.
+(function () {
+  const btn = document.getElementById("btnSettings");
+  const menu = document.getElementById("settingsMenu");
+  const costumePanel = document.getElementById("panel");
+  if (!btn || !menu) return;
+  const close = () => menu.classList.remove("open");
+  const closePanel = () => { if (costumePanel) costumePanel.classList.remove("open"); };
+  btn.addEventListener("click", () => menu.classList.toggle("open"));
+  menu.addEventListener("click", e => {
+    const b = e.target.closest("button");
+    if (b && (b.id === "btnName" || b.id === "btnCostume")) close();   // membuka panel lain: tutup menu
+  });
+  // klik/sentuh di luar menu (termasuk tombol arah di layar) -> menu tutup
+  document.addEventListener("pointerdown", e => {
+    if (!menu.contains(e.target) && !btn.contains(e.target)) close();
+    if (costumePanel && !costumePanel.contains(e.target)) closePanel();   // klik di luar panel Kostum
+  }, true);
+  window.addEventListener("keydown", e => { if (e.key === "Escape") { close(); closePanel(); } });
+
+  // Tombol chat 💬 (khusus HP): membuka kotak chat di bagian atas layar
+  // (di atas, supaya tidak tertutup keyboard HP). Menutup lagi setelah selesai mengetik.
+  const btnChat = document.getElementById("btnChat");
+  if (btnChat) {
+    btnChat.addEventListener("click", () => {
+      document.body.classList.add("chatOpen");
+      chatInput.focus();
+    });
+    chatInput.addEventListener("blur", () => setTimeout(() => {
+      if (document.activeElement !== chatInput) document.body.classList.remove("chatOpen");
+    }, 300));
+  }
+  // karakter bergerak (keyboard maupun tombol layar) -> menu tutup
+  setInterval(() => {
+    if (!player.moving) return;
+    if (menu.classList.contains("open")) close();
+    if (costumePanel && costumePanel.classList.contains("open")) closePanel();
+  }, 100);
+})();
