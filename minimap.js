@@ -1,11 +1,13 @@
 // ===================== PETA MINI (minimap) =====================
-// Menampilkan peta dunia kecil di kiri atas, lengkap dengan titik dan nama
-// semua pemain. Dimuat SETELAH game.js (lihat index.html).
-// Tombol "Peta" di kanan atas atau tombol keyboard M untuk menyembunyikan/menampilkan.
+// Menampilkan peta dunia kecil di kanan atas (di bawah tombol Peta/Setting), lengkap dengan
+// titik dan nama semua pemain. Dimuat SETELAH game.js (lihat index.html).
+// Tombol ✕ di pojok peta menutupnya; tombol "Peta" di kanan atas atau tombol keyboard M
+// untuk menampilkan/menyembunyikan lagi.
 (function () {
   // ---- Pengaturan (silakan ubah) ----
   const MAP_MAX_DESKTOP = 170;   // sisi terpanjang peta di komputer (piksel)
-  const MAP_MAX_MOBILE  = 120;   // sisi terpanjang peta di HP
+  const MAP_MAX_MOBILE  = 110;   // sisi terpanjang peta di HP (layar sempit)
+  const MAP_MAX_SHORT   = 84;    // sisi terpanjang peta di HP posisi miring (layar pendek)
   const COLOR_BG     = "rgba(35, 70, 40, 0.88)";
   const COLOR_BORDER = "rgba(255, 255, 255, 0.85)";
   const COLOR_SELF   = "#ffd93d";   // titik saya
@@ -17,7 +19,7 @@
   const canvas = document.createElement("canvas");
   canvas.id = "minimap";
   Object.assign(canvas.style, {
-    position: "fixed", left: "8px", top: "112px", zIndex: "5",
+    position: "fixed", right: "calc(8px + env(safe-area-inset-right, 0px))", top: "56px", zIndex: "5",
     pointerEvents: "none", borderRadius: "8px",
     boxShadow: "0 2px 10px rgba(0,0,0,.5)"
   });
@@ -25,6 +27,21 @@
   const g = canvas.getContext("2d");
 
   let shown = true;
+
+  // ---- Tombol tutup (✕) di pojok kanan atas peta ----
+  const closeBtn = document.createElement("button");
+  closeBtn.id = "btnMapClose";
+  closeBtn.type = "button";
+  closeBtn.title = "Tutup peta (M)";
+  closeBtn.textContent = "✕";
+  Object.assign(closeBtn.style, {
+    position: "fixed", zIndex: "6", display: "none", width: "24px", height: "24px",
+    padding: "0", border: "0", borderRadius: "50%", background: "rgba(0,0,0,.65)",
+    color: "#fff", font: "13px/24px system-ui, sans-serif", textAlign: "center", cursor: "pointer"
+  });
+  document.body.appendChild(closeBtn);
+  closeBtn.addEventListener("click", e => { e.stopPropagation(); if (shown) toggle(); });
+
   let mapW = 0, mapH = 0, dpr = 1, lastWW = 0, lastWH = 0, lastMax = 0;
 
   // ---- Tombol di bilah atas ----
@@ -41,6 +58,7 @@
   function toggle() {
     shown = !shown;
     canvas.style.display = shown ? "block" : "none";
+    if (!shown) closeBtn.style.display = "none";
     if (btn) btn.classList.toggle("off", !shown);
   }
   window.addEventListener("keydown", e => {
@@ -95,12 +113,16 @@
     try { ww = CONFIG.worldWidth; wh = CONFIG.worldHeight; } catch (e) { return; }   // game.js belum siap
     if (!(ww > 0 && wh > 0)) return;
 
-    const max = window.innerWidth <= 600 ? MAP_MAX_MOBILE : MAP_MAX_DESKTOP;
+    const max = window.innerHeight <= 500 ? MAP_MAX_SHORT : (window.innerWidth <= 600 ? MAP_MAX_MOBILE : MAP_MAX_DESKTOP);
     if (ww !== lastWW || wh !== lastWH || max !== lastMax) resize(ww, wh, max);
 
-    // letakkan tepat di bawah kotak info kiri atas
-    const info = document.getElementById("info");
-    if (info) canvas.style.top = Math.round(info.getBoundingClientRect().bottom + 8) + "px";
+    // letakkan di kanan atas, tepat di bawah tombol Peta/Setting
+    const bar = document.getElementById("topbar");
+    const top = bar ? Math.round(bar.getBoundingClientRect().bottom + 8) : 56;
+    canvas.style.top = top + "px";
+    closeBtn.style.top = (top + 4) + "px";
+    closeBtn.style.right = "calc(12px + env(safe-area-inset-right, 0px))";
+    closeBtn.style.display = "block";
 
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, mapW, mapH);
@@ -126,6 +148,18 @@
       const x = r.x * sx, y = r.y * sy;
       dot(x, y, 3, COLOR_OTHER);
       label(r.name, x, y);
+    }
+    // ayam (dari ayam.js)
+    if (typeof Ayam !== "undefined" && Ayam.showOnMinimap) {
+      for (const c of Ayam.list) {
+        g.beginPath();
+        g.arc(c.x * sx, c.y * sy, 2.5, 0, Math.PI * 2);
+        g.fillStyle = "#ffb347";
+        g.fill();
+        g.lineWidth = 1;
+        g.strokeStyle = "rgba(0,0,0,.7)";
+        g.stroke();
+      }
     }
     // saya (digambar terakhir agar paling atas)
     const px = player.x * sx, py = player.y * sy;

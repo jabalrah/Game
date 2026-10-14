@@ -109,22 +109,39 @@ Pemeriksaan otomatis di server:
 Semua pengaturan ada di bagian CONFIG pada game.js (ukuran peta, kecepatan, volume,
 durasi chat, serverUrl, dan lain-lain).
 
-Gambar (semua 5 frame, ukuran kanvas SAMA, latar transparan):
-  assets/background.png
-  assets/body/1.png ... 5.png            badan (warna kulit)
-  assets/pants/jeans/1.png ... 5.png     celana
-  assets/shoes/boots/1.png ... 5.png     sepatu
-  assets/shirt/hoodie/1.png ... 5.png    baju
-  assets/hat/cap/1.png ... 5.png         topi
-Bagian yang ingin bisa diwarnai digambar putih/abu-abu terang; garis tepi gelap tetap terlihat.
+Karakter: pemain memilih satu KARAKTER (badan + baju + celana + sepatu sudah menyatu).
+Daftar karakter dibaca OTOMATIS dari folder assets/body/. Tidak perlu mengedit game.js.
 
-Menambah kostum baru:
-  1. Buat folder assets/<bagian>/<nama>/ berisi 1.png ... 5.png
-  2. Tambahkan satu baris di daftar PARTS pada game.js, contoh:
-         { id: "tophat", name: "Topi Tinggi", tint: true }
-     id hanya boleh huruf kecil, angka, - dan _ (maks 24 karakter).
-  3. Jika gambar sudah berwarna penuh dan tidak ingin diwarnai: tint: false
-  Pemain lain otomatis melihat kostum baru itu, selama mereka memuat versi game.js yang sama.
+Menambah karakter baru:
+  1. Buat folder  assets/body/<nama>/        contoh: assets/body/baju-merah/
+  2. Isi dengan   1.png ... 6.png               (6 frame animasi JALAN, wajib)
+                   idle1.png ... idle3.png       (3 frame animasi DIAM/idle, boleh tidak ada)
+  3. Simpan, lalu muat ulang game (Ctrl+F5). Karakter baru muncul di menu Kostum.
+  Aturan:
+   - Ukuran kanvas semua gambar SAMA, latar transparan (bawaan 128 x 128).
+   - Frame 1 = pose diam.
+   - Nama folder: huruf kecil, angka, - dan _ saja, maksimal 24 karakter.
+   - Folder yang gambarnya tidak lengkap atau namanya tidak sesuai dilewati otomatis;
+     alasannya tertulis di Console browser (F12).
+  Jumlah frame diatur di game.js: CONFIG.frameCount (jalan, sekarang 6),
+  CONFIG.idleFrameCount (idle, sekarang 3), dan CONFIG.idleFps (kecepatan idle).
+  Animasi idle: diputar berulang saat karakter diam. Jika karakter tidak punya idle1-idle3,
+  game memakai frame jalan pertama sebagai gambar diam. Jika idle tidak lengkap (misalnya
+  hanya idle1.png), animasi idle itu tidak dipakai dan ada peringatan di Console.
+
+Cara game membaca daftar folder:
+  - Di komputer sendiri (localhost): dari daftar folder server web.
+  - Di GitHub Pages: dari API GitHub (dibatasi 60 permintaan per jam per alamat IP; hasilnya
+    disimpan di browser selama 2 menit). Jika gagal, memakai assets/body/daftar.json.
+  - assets/body/daftar.json dibuat otomatis oleh tes-lokal.ps1 dan mulai-server.ps1.
+    Kirim file ini ke GitHub bersama folder karakter baru (git add -A).
+  - Jika semuanya gagal, game memakai daftar bawaan CONFIG.fallbackBodies.
+
+Menambah karakter di GitHub:  git add -A  ->  git commit  ->  git push
+(tunggu 1-2 menit sampai GitHub Pages selesai, lalu Ctrl+F5).
+
+Gambar lain:
+  assets/background.png
 
 Suara (assets/audio/): bgm.wav (musik latar), step1.wav dan step2.wav (langkah).
   Ganti dengan file Anda dan sesuaikan nama di CONFIG jika berbeda. Untuk game yang sudah
@@ -146,3 +163,20 @@ CATATAN GITHUB PAGES
   - Filter kata hanya sebatas daftar yang Anda isi di BLOCKED_WORDS. Untuk game publik
     yang ramai, tetap perlu pemantauan.
   - Satu server memadai untuk puluhan pemain. Untuk ratusan pemain perlu desain yang berbeda.
+
+---------------------------------------------------------------------
+ F. AYAM (TANTANGAN KEJAR AYAM)
+---------------------------------------------------------------------
+File: ayam.js, assets/ayam/1.png 2.png 3.png (frame lari), assets/ayam/menang.png.
+Semua pengaturan ada di bagian AYAM di bagian atas ayam.js:
+  count            jumlah ayam (null = otomatis menurut luas peta; peta 3000x3000 = 12 ayam)
+  speedDiff        ayam lebih lambat sekian dari pemain (sekarang 2). Kecepatan kabur = CONFIG.speed - speedDiff
+  fleeDistance     jarak pemain yang membuat ayam kabur (sekarang 180)
+  calmDistance     lebih jauh dari ini ayam berhenti kabur (sekarang 260)
+  catchDistance    jarak tangkap (sekarang 44)
+  winPause         jeda pemain setelah menangkap, dalam detik (sekarang 0.5)
+  showOnMinimap    titik ayam di peta mini (true/false)
+Pose kemenangan: otomatis (pemain melompat sambil mengangkat ayam). Untuk gambar sendiri,
+simpan assets/body/<karakter>/menang.png (ukuran sama dengan frame karakter).
+Ayam dihitung di browser masing-masing pemain (tidak lewat server).
+Saat mengunggah ke GitHub, sertakan ayam.js dan folder assets/ayam.

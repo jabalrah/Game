@@ -12,7 +12,21 @@ const WORLD_W = Number(process.env.WORLD_WIDTH) || 3000;   // harus sama dengan 
 const WORLD_H = Number(process.env.WORLD_HEIGHT) || 3000;
 const MAX_PLAYERS = Number(process.env.MAX_PLAYERS) || 50;
 const MAX_PER_IP = Number(process.env.MAX_PER_IP) || 10;
-const TICK_MS = 50;                                         // siaran posisi 20 kali per detik
+const TICK_MS = 50;
+// ---- Ayam (dihitung di server supaya semua pemain melihat ayam yang sama) ----
+const CHICKEN_COUNT = Number(process.env.CHICKEN_COUNT) ||
+  Math.max(3, Math.min(40, Math.round((WORLD_W * WORLD_H) / 750000)));   // 1 ayam per 750.000 piksel persegi
+const CK = {
+  size: 64,            // ukuran ayam (dipakai untuk batas dinding)
+  wanderSpeed: 35,     // kecepatan jalan santai (piksel/detik)
+  fleeSpeed: 150,      // kecepatan kabur (piksel/detik) = kecepatan pemain 250 - 100
+  fleeDist: 180,       // pemain lebih dekat dari ini -> ayam kabur
+  calmDist: 260,       // lebih jauh dari ini -> ayam santai lagi
+  catchDist: 44,       // jarak tangkap
+  spawnMin: 500,       // ayam baru tidak muncul lebih dekat dari ini ke pemain mana pun
+  freezeMs: 1400,      // setelah menangkap, pemain itu tidak bisa menangkap lagi selama ini
+  sendEvery: 2         // kirim posisi ayam tiap 2 tick (10 kali per detik)
+};                                         // siaran posisi 20 kali per detik
 const CHAT_MIN_INTERVAL_MS = 700;                           // jeda minimal antar chat
 const MAX_CHAT_LENGTH = 80;
 const MAX_NAME_LENGTH = 16;
@@ -27,7 +41,7 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "")
 const BLOCKED_WORDS = (process.env.BLOCKED_WORDS || "")
   .split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
 
-const OUTFIT_PARTS = ["body", "hat", "shirt", "pants", "shoes"];
+const OUTFIT_PARTS = ["body"];   // hanya karakter (id = nama folder di assets/body/)
 
 // ---------- Fungsi pembersih & pemeriksa data ----------
 const CONTROL_CHARS = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g;
@@ -70,8 +84,87 @@ const dirty = new Set();        // id pemain yang posisinya berubah sejak siaran
 const ipCount = new Map();      // alamat IP -> jumlah koneksi
 let nextId = 1;
 
+// ---------- Ayam ----------
+const rnd = (a, b) => a + Math.random() * (b - a);
+const chickens = [];
+let nextChickenId = 1;
+const chickenInfo = c => [c.id, Math.round(c.x), Math.round(c.y), c.left ? 1 : 0, c.moving ? 1 : 0, c.fleeing ? 1 : 0];
+
+function newWander(c) {
+  if (Math.random() < 0.4) { c.moving = false; c.dx = c.dy = 0; }
+  else {
+    const a = Math.random() * Math.PI * 2;
+    c.dx = Math.cos(a); c.dy = Math.sin(a); c.moving = true;
+    c.left = c.dx < 0;
+  }
+  c.timer = rnd(1, 3.5);
+}
+function spawnChicken() {
+  const half = CK.size / 2;
+  let x = 0, y = 0;
+  for (let i = 0; i < 40; i++) {
+    x = rnd(half, WORLD_W - half); y = rnd(half, WORLD_H - half);
+    let ok = true;
+    for (const p of players.values()) if (Math.hypot(x - p.x, y - p.y) < CK.spawnMin) { ok = false; break; }
+    if (ok) break;
+  }
+  const c = { id: nextChickenId++, x, y, dx: 0, dy: 0, left: Math.random() < 0.5, moving: false, fleeing: false, timer: 0, changed: true };
+  newWander(c);
+  chickens.push(c);
+  return c;
+}
+for (let i = 0; i < CHICKEN_COUNT; i++) spawnChicken();
+
+function updateChickens(dt, now) {
+  const half = CK.size / 2;
+  for (const c of chickens) {
+    // pemain terdekat
+    let near = null, nd = Infinity;
+    for (const p of players.values()) {
+      const d = Math.hypot(c.x - p.x, c.y - p.y);
+      if (d < nd) { nd = d; near = p; }
+    }
+    const wasFleeing = c.fleeing;
+    if (near && nd < CK.fleeDist) c.fleeing = true;
+    else if (!near || nd > CK.calmDist) { if (c.fleeing) { c.fleeing = false; newWander(c); } }
+
+    let vx = 0, vy = 0, speed = 0;
+    if (c.fleeing) {
+      if (nd > 0.001) { vx = (c.x - near.x) / nd; vy = (c.y - near.y) / nd; }
+      else { const a = Math.random() * Math.PI * 2; vx = Math.cos(a); vy = Math.sin(a); }
+      speed = CK.fleeSpeed; c.moving = true;
+    } else {
+      c.timer -= dt;
+      if (c.timer <= 0) newWander(c);
+      vx = c.dx; vy = c.dy; speed = CK.wanderSpeed;
+    }
+    const ox = c.x, oy = c.y, wasMoving = c.moving, wasLeft = c.left;
+    c.x = Math.max(half, Math.min(WORLD_W - half, c.x + vx * speed * dt));
+    c.y = Math.max(half, Math.min(WORLD_H - half, c.y + vy * speed * dt));
+    if (!c.fleeing && c.moving && c.x === ox && c.y === oy) newWander(c);   // buntu: ganti arah
+    if (vx !== 0 && c.x !== ox) c.left = vx < 0;
+    if (c.x !== ox || c.y !== oy || c.moving !== wasMoving || c.left !== wasLeft || c.fleeing !== wasFleeing) c.changed = true;
+  }
+  // tangkapan: server yang memutuskan siapa yang dapat
+  for (const p of players.values()) {
+    if ((p.freezeUntil || 0) > now) continue;
+    for (let i = 0; i < chickens.length; i++) {
+      const c = chickens[i];
+      if (Math.hypot(c.x - p.x, c.y - p.y) <= CK.catchDist) {
+        chickens.splice(i, 1);
+        const n = spawnChicken();              // ayam baru supaya jumlah tetap
+        p.freezeUntil = now + CK.freezeMs;
+        p.score = (p.score || 0) + 1;          // skor dihitung di server
+        broadcast({ t: "caught", id: c.id, by: p.id, score: p.score, n: chickenInfo(n) });
+        n.changed = false;
+        break;
+      }
+    }
+  }
+}
+
 function publicInfo(p) {
-  return { id: p.id, name: p.name, outfit: p.outfit, x: p.x, y: p.y, l: p.left ? 1 : 0, m: p.moving ? 1 : 0 };
+  return { id: p.id, name: p.name, outfit: p.outfit, x: p.x, y: p.y, l: p.left ? 1 : 0, m: p.moving ? 1 : 0, s: p.score || 0 };
 }
 function sendRaw(ws, text) {
   if (ws.readyState === 1) ws.send(text);
@@ -158,12 +251,12 @@ wss.on("connection", (ws, req) => {
         id: nextId++, ws, name, outfit,
         x: num(msg.x, 0, WORLD_W) ?? WORLD_W / 2,
         y: num(msg.y, 0, WORLD_H) ?? WORLD_H / 2,
-        left: !!msg.l, moving: false
+        left: !!msg.l, moving: false, score: 0
       };
       clearTimeout(joinTimer);
       const others = [...players.values()].map(publicInfo);
       players.set(me.id, me);
-      sendTo(ws, { t: "welcome", id: me.id, world: { w: WORLD_W, h: WORLD_H }, players: others });
+      sendTo(ws, { t: "welcome", id: me.id, world: { w: WORLD_W, h: WORLD_H }, players: others, chickens: chickens.map(chickenInfo) });
       broadcast({ t: "join", player: publicInfo(me) }, me.id);
       return;
     }
@@ -223,7 +316,21 @@ wss.on("connection", (ws, req) => {
 });
 
 // ---------- Siaran posisi berkala ----------
+let tickNo = 0, lastTick = Date.now();
 setInterval(() => {
+  const now = Date.now();
+  const dt = Math.min(0.25, (now - lastTick) / 1000);
+  lastTick = now;
+  if (players.size) {                          // tidak ada pemain = ayam diam (hemat CPU)
+    updateChickens(dt, now);
+    if (++tickNo % CK.sendEvery === 0) {
+      const moved = chickens.filter(c => c.changed);
+      if (moved.length) {
+        broadcast({ t: "ck", c: moved.map(chickenInfo) });
+        moved.forEach(c => { c.changed = false; });
+      }
+    }
+  }
   if (!dirty.size) return;
   const list = [];
   for (const id of dirty) {
@@ -245,6 +352,6 @@ setInterval(() => {
 
 server.listen(PORT, () => {
   console.log(`Server berjalan di port ${PORT}`);
-  console.log(`Dunia ${WORLD_W}x${WORLD_H}, maks ${MAX_PLAYERS} pemain`);
+  console.log(`Dunia ${WORLD_W}x${WORLD_H}, maks ${MAX_PLAYERS} pemain, ${CHICKEN_COUNT} ayam`);
   if (ALLOWED_ORIGINS.length) console.log("Alamat diizinkan:", ALLOWED_ORIGINS.join(", "));
 });
