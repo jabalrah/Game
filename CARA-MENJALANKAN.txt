@@ -94,7 +94,13 @@ PERLU DIKETAHUI TENTANG PAKET GRATIS RENDER
   MAX_PER_IP       Batas koneksi dari satu jaringan (bawaan 10).
   BLOCKED_WORDS    Kata yang disensor di chat dan ditolak di nama, pisahkan dengan koma.
                    Contoh: kata1,kata2,kata3
-  WORLD_WIDTH, WORLD_HEIGHT   Ukuran peta (bawaan 3000 x 3000). Ukuran dari server
+  WS_DEFLATE       Kompresi WebSocket, bawaan AKTIF (hemat upload ~65%, CPU naik). Isi 0 untuk mematikan
+                   (disarankan jika server di hosting dengan CPU kecil).
+  NEAR_RADIUS      Radius "dekat" (piksel) jika klien tidak mengirim ukuran layar (bawaan 1500).
+  CROWD_AT         Jumlah pemain di atas ini: posisi dekat dikirim 10x/detik, bukan 20x (bawaan 24).
+  BOARD_SIZE       Jumlah baris papan skor (bawaan 10). Skor = jumlah kupu-kupu yang ditangkap selama online.
+  CHICKEN_COUNT    Jumlah ayam di server (bawaan 0 = mati, karena game belum memuat ayam.js).
+  WORLD_WIDTH, WORLD_HEIGHT   Ukuran peta (bawaan 4096 x 4096). Ukuran dari server
                    otomatis dipakai oleh game.
 
 Pemeriksaan otomatis di server:
@@ -141,7 +147,20 @@ Menambah karakter di GitHub:  git add -A  ->  git commit  ->  git push
 (tunggu 1-2 menit sampai GitHub Pages selesai, lalu Ctrl+F5).
 
 Gambar lain:
-  assets/background.png
+  assets/background.png  latar. backgroundMode di CONFIG (bawaan "auto"):
+    - file latar sebesar peta (mis. 4096 x 4096) -> dipakai SATU file penuh, tidak diulang,
+      dan ukuran peta otomatis mengikuti file itu.
+    - file latar lebih kecil (mis. 1024 x 1024) -> diulang seperti ubin.
+    Paksa dengan "map" (satu file penuh), "tile" (diulang), atau "stretch" (diregangkan).
+  assets/layer.png  (OPSIONAL) layer rintangan di atas latar. PNG transparan.
+    Bagian yang TERISI gambar = tembok (pemain tidak bisa lewat), bagian BOLONG = bisa dilewati.
+    layerMode "map" (bawaan): SATU file menutupi seluruh peta, contoh latar 1024 x 4 = 4096 x 4096.
+      Ukuran peta otomatis = ukuran layer. Kalau online, isi WORLD_WIDTH dan WORLD_HEIGHT di server
+      dengan ukuran yang sama (bawaan server sudah 4096). Mode lain: "tile" (diulang), "stretch".
+    Kotak tabrak ada di kaki karakter; diatur lewat layerHitWidth/layerHitHeight di CONFIG.
+    Isi layerDebug: true untuk melihat kotak tabraknya.
+    Game harus dibuka lewat server/localhost (bukan klik dua kali index.html) agar tabrakan terbaca.
+    Buka F12 (console) untuk melihat pesan status layer.
 
 Suara (assets/audio/): bgm.wav (musik latar), step1.wav dan step2.wav (langkah).
   Ganti dengan file Anda dan sesuaikan nama di CONFIG jika berbeda. Untuk game yang sudah
@@ -165,18 +184,27 @@ CATATAN GITHUB PAGES
   - Satu server memadai untuk puluhan pemain. Untuk ratusan pemain perlu desain yang berbeda.
 
 ---------------------------------------------------------------------
- F. AYAM (TANTANGAN KEJAR AYAM)
+ E. NPC & KUPU-KUPU BERSAMA (dihitung di server)
 ---------------------------------------------------------------------
-File: ayam.js, assets/ayam/1.png 2.png 3.png (frame lari), assets/ayam/menang.png.
-Semua pengaturan ada di bagian AYAM di bagian atas ayam.js:
-  count            jumlah ayam (null = otomatis menurut luas peta; peta 3000x3000 = 12 ayam)
-  speedDiff        ayam lebih lambat sekian dari pemain (sekarang 2). Kecepatan kabur = CONFIG.speed - speedDiff
-  fleeDistance     jarak pemain yang membuat ayam kabur (sekarang 180)
-  calmDistance     lebih jauh dari ini ayam berhenti kabur (sekarang 260)
-  catchDistance    jarak tangkap (sekarang 44)
-  winPause         jeda pemain setelah menangkap, dalam detik (sekarang 0.5)
-  showOnMinimap    titik ayam di peta mini (true/false)
-Pose kemenangan: otomatis (pemain melompat sambil mengangkat ayam). Untuk gambar sendiri,
-simpan assets/body/<karakter>/menang.png (ukuran sama dengan frame karakter).
-Ayam dihitung di browser masing-masing pemain (tidak lewat server).
-Saat mengunggah ke GitHub, sertakan ayam.js dan folder assets/ayam.
+Saat online, NPC, komentar NPC, dan kupu-kupu dihitung di SERVER (server/dunia.js),
+jadi semua pemain melihat yang sama. Siapa yang menangkap kupu-kupu lebih dulu yang
+mendapatkannya. Jumlah tangkapan tetap disimpan di browser masing-masing.
+
+Yang perlu diperhatikan:
+  - Jalankan "npm install" lagi di folder server (ada tambahan paket pngjs).
+  - Folder server/ berisi dua SALINAN file game:
+        server/layer.png         salinan assets/layer.png   (rintangan untuk NPC)
+        server/npc-komentar.js   salinan npc-komentar.js    (kalimat & nama NPC)
+    Kalau Anda mengubah salah satunya di game, salin juga ke folder server/ lalu
+    jalankan ulang server.
+  - Pengaturan gerak NPC (NPC_CONFIG di npc.js) dan kupu-kupu (KUPU_CONFIG di kupu.js)
+    ada duplikatnya di bagian atas server/dunia.js. Ubah di dua tempat supaya sama.
+  - Tanpa server (serverUrl kosong), NPC & kupu-kupu dihitung di browser seperti biasa.
+    Kalau server sedang tidak tersambung, NPC & kupu-kupu menghilang sampai tersambung lagi.
+
+---------------------------------------------------------------------
+ E. OPTIMASI KINERJA (lihat OPTIMASI.md)
+---------------------------------------------------------------------
+  - Server hanya mengirim data pemain/kupu-kupu yang dekat layar tiap pemain; tab tersembunyi tidak dikirimi.
+  - perf.js menurunkan efek otomatis jika game terasa berat. Tombol "Grafik: Otomatis/Penuh" ada di menu Setting.
+  - Deploy server dan game BERSAMAAN (protokol bertambah: view, vis, kz).

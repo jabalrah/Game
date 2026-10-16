@@ -5,17 +5,31 @@
 // =====================================================================
 const http = require("http");
 const { WebSocketServer } = require("ws");
+const { createDunia } = require("./dunia");   // NPC & kupu-kupu bersama (lihat dunia.js)
 
 // ---------- Pengaturan (bisa diubah lewat environment variable) ----------
 const PORT = Number(process.env.PORT) || 3000;
-const WORLD_W = Number(process.env.WORLD_WIDTH) || 3000;   // harus sama dengan peta di game
-const WORLD_H = Number(process.env.WORLD_HEIGHT) || 3000;
+const WORLD_W = Number(process.env.WORLD_WIDTH) || 4096;   // harus sama dengan peta di game
+const WORLD_H = Number(process.env.WORLD_HEIGHT) || 4096;
 const MAX_PLAYERS = Number(process.env.MAX_PLAYERS) || 50;
 const MAX_PER_IP = Number(process.env.MAX_PER_IP) || 10;
 const TICK_MS = 50;
+// ---- Pembaruan posisi bertingkat (hemat bandwidth) ----
+// Tiap pemain hanya menerima posisi pemain lain yang DEKAT (di dalam/dekat layarnya) 20 kali per detik.
+// Pemain yang jauh (hanya terlihat di peta mini) dikirim 2 kali per detik. Radius mengikuti ukuran layar
+// pemain (dikirim klien); nilai di bawah dipakai jika klien tidak mengirim ukuran layar.
+const DEFAULT_VIEW_RADIUS = Number(process.env.NEAR_RADIUS) || 1500;   // piksel
+const FAR_EVERY = 10;             // pemain jauh: tiap 10 tick = 2 kali per detik
+const FAR_BAND = 250;             // tumpang tindih zona (piksel) supaya posisi akhir pemain yang berhenti tidak terlewat
+const CROWD_AT = Number(process.env.CROWD_AT) || 24;   // lebih dari ini pemain: posisi dekat dikirim 10x/detik, bukan 20x
+// ---- Pelindung koneksi lambat ----
+const CONGEST_BYTES = 128 * 1024; // antrean kirim > ini: lewati pembaruan (pemain itu disinkronkan penuh nanti)
+const KILL_BYTES = 2 * 1024 * 1024; // antrean > ini: koneksi diputus (macet total)
 // ---- Ayam (dihitung di server supaya semua pemain melihat ayam yang sama) ----
-const CHICKEN_COUNT = Number(process.env.CHICKEN_COUNT) ||
-  Math.max(3, Math.min(40, Math.round((WORLD_W * WORLD_H) / 750000)));   // 1 ayam per 750.000 piksel persegi
+// OPTIMASI: klien saat ini TIDAK punya kode ayam (ayam.js tidak dimuat index.html), jadi data ayam
+// hanya membuang bandwidth & CPU. Default 0 = mati. Kalau fitur ayam dipakai lagi, set CHICKEN_COUNT
+// (contoh rumus lama: Math.round(WORLD_W * WORLD_H / 750000) = 22 ayam untuk peta 4096x4096).
+const CHICKEN_COUNT = Number(process.env.CHICKEN_COUNT) || 0;
 const CK = {
   size: 64,            // ukuran ayam (dipakai untuk batas dinding)
   wanderSpeed: 35,     // kecepatan jalan santai (piksel/detik)
@@ -40,6 +54,10 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "")
 // Kata yang disensor/ditolak, dipisah koma. Contoh: BLOCKED_WORDS=kata1,kata2
 const BLOCKED_WORDS = (process.env.BLOCKED_WORDS || "")
   .split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+
+// ---- Papan skor: jumlah tangkapan (kupu-kupu) tiap pemain selama masih online; dihitung di server ----
+const BOARD_SIZE = Number(process.env.BOARD_SIZE) || 10;   // jumlah baris yang ditampilkan
+let boardDirty = true;                                      // true = papan perlu dikirim ulang
 
 const OUTFIT_PARTS = ["body"];   // hanya karakter (id = nama folder di assets/body/)
 
@@ -80,7 +98,11 @@ function num(v, min, max) {
 
 // ---------- State ----------
 const players = new Map();      // id -> pemain yang sudah join
-const dirty = new Set();        // id pemain yang posisinya berubah sejak siaran terakhir
+const dirty1 = new Set();       // id pemain yang posisinya berubah sejak tick terakhir
+const dirty2 = new Set();       // ... sejak 2 tick terakhir (untuk mode ramai)
+const dirty10 = new Set();      // ... sejak 10 tick terakhir (untuk pemain jauh)
+function markDirty(id) { dirty1.add(id); dirty2.add(id); dirty10.add(id); }
+function unmarkDirty(id) { dirty1.delete(id); dirty2.delete(id); dirty10.delete(id); }
 const ipCount = new Map();      // alamat IP -> jumlah koneksi
 let nextId = 1;
 
@@ -155,6 +177,7 @@ function updateChickens(dt, now) {
         const n = spawnChicken();              // ayam baru supaya jumlah tetap
         p.freezeUntil = now + CK.freezeMs;
         p.score = (p.score || 0) + 1;          // skor dihitung di server
+        boardDirty = true;
         broadcast({ t: "caught", id: c.id, by: p.id, score: p.score, n: chickenInfo(n) });
         n.changed = false;
         break;
@@ -164,12 +187,32 @@ function updateChickens(dt, now) {
 }
 
 function publicInfo(p) {
-  return { id: p.id, name: p.name, outfit: p.outfit, x: p.x, y: p.y, l: p.left ? 1 : 0, m: p.moving ? 1 : 0, s: p.score || 0 };
+  return { id: p.id, name: p.name, outfit: p.outfit, x: p.x, y: p.y, l: p.left ? 1 : 0, m: p.moving ? 1 : 0, z: p.lying ? 1 : 0, s: p.score || 0 };
 }
 function sendRaw(ws, text) {
   if (ws.readyState === 1) ws.send(text);
 }
 function sendTo(ws, obj) { sendRaw(ws, JSON.stringify(obj)); }
+// Kirim data "keadaan" (posisi, NPC, kupu-kupu) ke satu pemain dengan pelindung:
+//  - tab pemain sedang disembunyikan -> tidak dikirim (nanti disinkronkan penuh saat kembali)
+//  - antrean kirim menumpuk (koneksi lambat) -> dilewati; kalau resyncKey diberikan, pemain itu ditandai
+//    supaya menerima keadaan LENGKAP saat lancar lagi; antrean sangat besar -> koneksi diputus.
+function sendState(p, text, resyncKey) {
+  const ws = p.ws;
+  if (ws.readyState !== 1) return false;
+  if (p.hidden) { if (resyncKey) p[resyncKey] = true; return false; }
+  const b = ws.bufferedAmount;
+  if (b > KILL_BYTES) { ws.terminate(); return false; }
+  if (b > CONGEST_BYTES) { if (resyncKey) p[resyncKey] = true; return false; }
+  ws.send(text);
+  return true;
+}
+function setView(p, vr) {   // radius pandang pemain = setengah diagonal layar + cadangan
+  const r = typeof vr === "number" && Number.isFinite(vr) ? Math.max(500, Math.min(3200, Math.round(vr) + 250)) : DEFAULT_VIEW_RADIUS;
+  p.nr2 = r * r;
+  const f = Math.max(0, r - FAR_BAND);
+  p.fr2 = f * f;
+}
 function broadcast(obj, exceptId = null) {
   const text = JSON.stringify(obj);
   for (const p of players.values()) {
@@ -182,6 +225,9 @@ function ipOf(req) {
   return req.socket.remoteAddress || "unknown";
 }
 
+// ---------- NPC & kupu-kupu (dihitung di server, sama untuk semua pemain) ----------
+const dunia = createDunia({ W: WORLD_W, H: WORLD_H, players, broadcast, sendTo, sendState, onScore: () => { boardDirty = true; } });
+
 // ---------- Server HTTP (untuk cek status) ----------
 const server = http.createServer((req, res) => {
   if (req.url === "/health") { res.writeHead(200, { "Content-Type": "text/plain" }); res.end("ok"); return; }
@@ -189,7 +235,13 @@ const server = http.createServer((req, res) => {
   res.end(`Server game berjalan.\nPemain online: ${players.size}/${MAX_PLAYERS}\n`);
 });
 
-const wss = new WebSocketServer({ server, maxPayload: 4096 });
+// Kompresi WebSocket (permessage-deflate): browser menegosiasikannya otomatis. Menghemat bandwidth upload
+// (yang biasanya paling sempit di PC/hosting kecil) dengan sedikit tambahan CPU. Matikan: WS_DEFLATE=0
+const WS_DEFLATE = process.env.WS_DEFLATE !== "0";
+const wss = new WebSocketServer({
+  server, maxPayload: 4096,
+  perMessageDeflate: WS_DEFLATE ? { threshold: 200, zlibDeflateOptions: { level: 3 }, concurrencyLimit: 10 } : false
+});
 
 wss.on("connection", (ws, req) => {
   const ip = ipOf(req);
@@ -251,12 +303,16 @@ wss.on("connection", (ws, req) => {
         id: nextId++, ws, name, outfit,
         x: num(msg.x, 0, WORLD_W) ?? WORLD_W / 2,
         y: num(msg.y, 0, WORLD_H) ?? WORLD_H / 2,
-        left: !!msg.l, moving: false, score: 0
+        left: !!msg.l, moving: false, lying: false, score: 0,
+        hidden: false, resyncSnap: false, resyncNpc: false, resyncBoard: true
       };
+      boardDirty = true;
+      setView(me, msg.vr);
+      me.row = [me.id, Math.round(me.x), Math.round(me.y), me.left ? 1 : 0, 0, 0];
       clearTimeout(joinTimer);
       const others = [...players.values()].map(publicInfo);
       players.set(me.id, me);
-      sendTo(ws, { t: "welcome", id: me.id, world: { w: WORLD_W, h: WORLD_H }, players: others, chickens: chickens.map(chickenInfo) });
+      sendTo(ws, { t: "welcome", id: me.id, world: { w: WORLD_W, h: WORLD_H }, players: others, chickens: chickens.map(chickenInfo), ...dunia.welcome() });
       broadcast({ t: "join", player: publicInfo(me) }, me.id);
       return;
     }
@@ -267,8 +323,18 @@ wss.on("connection", (ws, req) => {
       case "move": {
         const x = num(msg.x, 0, WORLD_W), y = num(msg.y, 0, WORLD_H);
         if (x === null || y === null) return;
-        me.x = x; me.y = y; me.left = !!msg.l; me.moving = !!msg.m;
-        dirty.add(me.id);
+        me.x = x; me.y = y; me.left = !!msg.l; me.moving = !!msg.m; me.lying = !!msg.z && !msg.m;
+        me.row = [me.id, Math.round(x), Math.round(y), me.left ? 1 : 0, me.moving ? 1 : 0, me.lying ? 1 : 0];
+        markDirty(me.id);
+        break;
+      }
+      case "view": {                   // ukuran layar berubah
+        setView(me, msg.r);
+        break;
+      }
+      case "vis": {                    // tab disembunyikan / ditampilkan lagi
+        me.hidden = !msg.v;
+        me.resyncSnap = true; me.resyncNpc = true; me.resyncBoard = true;   // saat kembali tampil: kirim keadaan lengkap
         break;
       }
       case "chat": {
@@ -280,6 +346,10 @@ wss.on("connection", (ws, req) => {
         if (!text) return;
         lastChat = now;
         broadcast({ t: "chat", id: me.id, text }, me.id);
+        break;
+      }
+      case "net": {                         // mengayun jaring kupu-kupu
+        dunia.handleNet(me, ws, msg, now);
         break;
       }
       case "outfit": {
@@ -295,7 +365,7 @@ wss.on("connection", (ws, req) => {
           sendTo(ws, { t: "error", msg: "Nama tidak valid atau tidak diperbolehkan" });
           return;
         }
-        me.name = name;
+        me.name = name; boardDirty = true;
         broadcast({ t: "name", id: me.id, name }, me.id);
         break;
       }
@@ -308,37 +378,92 @@ wss.on("connection", (ws, req) => {
     if (c <= 0) ipCount.delete(ip); else ipCount.set(ip, c);
     if (me && players.get(me.id) === me) {
       players.delete(me.id);
-      dirty.delete(me.id);
+      unmarkDirty(me.id); boardDirty = true;
       broadcast({ t: "leave", id: me.id });
     }
   });
   ws.on("error", () => {});
 });
 
-// ---------- Siaran posisi berkala ----------
+// ---------- Siaran posisi berkala (pemain, ayam, NPC, kupu-kupu) ----------
+// Posisi pemain dikirim per penerima, bertingkat menurut jarak (lihat DEFAULT_VIEW_RADIUS di atas):
+//   dekat  -> tiap tick (20x/detik), atau tiap 2 tick (10x/detik) kalau pemain ramai
+//   jauh   -> tiap 10 tick (2x/detik)
+// Perubahan dikumpulkan (dirty1/2/10) sehingga tidak ada pembaruan yang hilang di antara pengiriman.
+function flushSnaps(tickNo) {
+  const nearPeriod = players.size > CROWD_AT ? 2 : 1;
+  const nearSet = nearPeriod === 1 ? dirty1 : dirty2;
+  const doNear = tickNo % nearPeriod === 0 && nearSet.size > 0;
+  const doFar = tickNo % FAR_EVERY === 0 && dirty10.size > 0;
+  for (const r of players.values()) {
+    if (r.hidden) continue;
+    let list;
+    if (r.resyncSnap) {                         // keadaan lengkap: semua pemain lain
+      list = [];
+      for (const p of players.values()) if (p !== r && p.row) list.push(p.row);
+      if (sendState(r, JSON.stringify({ t: "snap", p: list }), "resyncSnap")) r.resyncSnap = false;
+      continue;
+    }
+    if (!doNear && !doFar) continue;
+    list = [];
+    if (doNear) {
+      for (const id of nearSet) {
+        const p = players.get(id);
+        if (!p || p === r) continue;
+        const dx = p.x - r.x, dy = p.y - r.y;
+        if (dx * dx + dy * dy < r.nr2) list.push(p.row);
+      }
+    }
+    if (doFar) {
+      for (const id of dirty10) {
+        const p = players.get(id);
+        if (!p || p === r) continue;
+        const dx = p.x - r.x, dy = p.y - r.y, d2 = dx * dx + dy * dy;
+        if (d2 >= r.fr2 && !(doNear && d2 < r.nr2 && nearSet.has(id))) list.push(p.row);
+      }
+    }
+    if (list.length) sendState(r, JSON.stringify({ t: "snap", p: list }), "resyncSnap");
+  }
+  dirty1.clear();
+  if (tickNo % 2 === 0) dirty2.clear();
+  if (tickNo % FAR_EVERY === 0) dirty10.clear();
+}
+
+// Papan skor: dikirim paling sering 1x/detik, hanya kalau ada perubahan. Tiap pemain juga menerima
+// peringkat & skornya sendiri (me: [peringkat, skor]) supaya tahu posisinya walau di luar 10 besar.
+function sendBoards() {
+  const ranked = [...players.values()].filter(p => (p.score || 0) > 0)
+    .sort((a, b) => b.score - a.score || a.id - b.id);
+  const top = ranked.slice(0, BOARD_SIZE).map(p => [p.id, p.name, p.score]);
+  for (const p of players.values()) {
+    if (!boardDirty && !p.resyncBoard) continue;
+    const i = ranked.indexOf(p);
+    const text = JSON.stringify({ t: "board", b: top, me: [i < 0 ? 0 : i + 1, p.score || 0], n: players.size });
+    if (sendState(p, text, "resyncBoard")) p.resyncBoard = false;
+  }
+  boardDirty = false;
+}
+
 let tickNo = 0, lastTick = Date.now();
 setInterval(() => {
   const now = Date.now();
   const dt = Math.min(0.25, (now - lastTick) / 1000);
   lastTick = now;
-  if (players.size) {                          // tidak ada pemain = ayam diam (hemat CPU)
-    updateChickens(dt, now);
-    if (++tickNo % CK.sendEvery === 0) {
-      const moved = chickens.filter(c => c.changed);
-      if (moved.length) {
-        broadcast({ t: "ck", c: moved.map(chickenInfo) });
-        moved.forEach(c => { c.changed = false; });
-      }
+  if (!players.size) return;                   // tidak ada pemain = dunia diam (hemat CPU)
+  tickNo++;
+  if (chickens.length) updateChickens(dt, now);
+  const sendNow = tickNo % CK.sendEvery === 0;
+  dunia.tick(dt, now, sendNow);
+  if (sendNow && chickens.length) {
+    const moved = chickens.filter(c => c.changed);
+    if (moved.length) {
+      const text = JSON.stringify({ t: "ck", c: moved.map(chickenInfo) });
+      for (const p of players.values()) sendState(p, text, null);
+      moved.forEach(c => { c.changed = false; });
     }
   }
-  if (!dirty.size) return;
-  const list = [];
-  for (const id of dirty) {
-    const p = players.get(id);
-    if (p) list.push([p.id, Math.round(p.x), Math.round(p.y), p.left ? 1 : 0, p.moving ? 1 : 0]);
-  }
-  dirty.clear();
-  if (list.length) broadcast({ t: "snap", p: list });
+  flushSnaps(tickNo);
+  if (tickNo % 20 === 0) sendBoards();
 }, TICK_MS);
 
 // ---------- Cek koneksi mati ----------
