@@ -85,7 +85,7 @@ const CONFIG = {
   // Alamat server. Saat tes di komputer sendiri: "ws://localhost:3000"
   // Setelah server di-hosting, ganti dengan alamatnya, contoh: "wss://nama-game.onrender.com"
   // Kosongkan ("") untuk bermain sendiri tanpa server.
-  serverUrl: "wss://joan-zope-hawaii-freight.trycloudflare.com",
+  serverUrl: "wss://fairy-turns-sydney-advisor.trycloudflare.com",
   sendInterval: 66,         // jeda minimal kirim posisi (milidetik), sekitar 15 kali per detik
   remoteSmoothing: 14       // makin besar, gerak pemain lain makin cepat menyusul posisi terbaru
 };
