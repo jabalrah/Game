@@ -85,7 +85,7 @@ const CONFIG = {
   // Alamat server. Saat tes di komputer sendiri: "ws://localhost:3000"
   // Setelah server di-hosting, ganti dengan alamatnya, contoh: "wss://nama-game.onrender.com"
   // Kosongkan ("") untuk bermain sendiri tanpa server.
-  serverUrl: "wss://finder-synopsis-reasonably-cliff.trycloudflare.com",
+  serverUrl: "wss://joan-zope-hawaii-freight.trycloudflare.com",
   sendInterval: 66,         // jeda minimal kirim posisi (milidetik), sekitar 15 kali per detik
   remoteSmoothing: 14       // makin besar, gerak pemain lain makin cepat menyusul posisi terbaru
 };
@@ -788,6 +788,7 @@ function netConnect() {
     remotePlayers.clear();
     if (typeof Npc !== "undefined") Npc.netLost();
     if (typeof Kupu !== "undefined") Kupu.netLost();
+    if (typeof Papan !== "undefined") Papan.reset();
     if (!netNote) netNote = "Tidak terhubung ke server";
     updateNetStatus();
     scheduleReconnect();
@@ -858,6 +859,7 @@ function handleNetMessage(msg) {
       }
       break;
     }
+    case "board": if (typeof Papan !== "undefined") Papan.net(msg); break;
     case "npc": case "npcsay": if (typeof Npc !== "undefined") Npc.net(msg); break;
     case "kp": case "kc": case "km": case "kz": if (typeof Kupu !== "undefined") Kupu.net(msg); break;
     case "outfit": {
