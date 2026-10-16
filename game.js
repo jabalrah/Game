@@ -1,13 +1,49 @@
 // ===================== PENGATURAN GAME (silakan ubah) =====================
 const CONFIG = {
-  backgroundImages: ["assets/background1.png", "assets/background2.png", "assets/background3.png"], // 3 frame animasi latar
-  backgroundImage: "assets/background.png", // cadangan: dipakai kalau frame di atas tidak ada
-  backgroundFps: 3,         // kecepatan animasi latar (frame per detik); 0 = tidak beranimasi
+  backgroundImage: "assets/background.png", // gambar latar (diam, tanpa animasi)
   backgroundColor: "#ffffff", // warna dasar di bawah gambar latar (terlihat di bagian PNG yang bolong/transparan)
-  backgroundMode: "tile",   // "tile" = diulang seperti ubin, "stretch" = diregangkan
+  // backgroundMode: "auto"    = otomatis: kalau file latar sebesar peta (atau layer) -> "map"; kalau lebih kecil -> "tile"
+  //                 "map"     = SATU file latar menutupi seluruh peta (contoh 4096 x 4096), digambar sekali, tidak diulang.
+  //                           Ukuran peta otomatis = ukuran file latar (kalau tidak ada layer.png).
+  //                 "tile"    = diulang seperti ubin (cocok untuk gambar kecil, mis. 1024 x 1024)
+  //                 "stretch" = diregangkan memenuhi peta
+  backgroundMode: "auto",
 
-  worldWidth: 3000,         // ukuran peta (piksel). Saat online, ukuran dari server yang dipakai.
-  worldHeight: 3000,
+  // Layer di atas latar (PNG). Bagian yang TERISI gambar = tembok/rintangan (pemain tidak bisa lewat);
+  // bagian BOLONG (transparan) = bisa dilewati.
+  // layerMode: "map"     = SATU file layer menutupi seluruh peta (contoh latar 1024 x 4 = 4096 x 4096),
+  //                        digambar sekali dari pojok kiri-atas peta, tidak diulang. Ukuran peta otomatis = ukuran layer.
+  //            "tile"    = diulang seperti ubin (ikut ukuran file layer)
+  //            "stretch" = diregangkan memenuhi peta
+  layerMode: "map",
+  layerImage: "assets/layer.png",   // kalau file tidak ada, game jalan seperti biasa tanpa rintangan
+  layerAlphaMin: 40,        // piksel dianggap terisi jika transparansinya (0-255) di atas angka ini
+  layerHitWidth: 40,        // lebar kotak tabrak di kaki karakter (piksel)
+  layerHitHeight: 20,       // tinggi kotak tabrak di kaki karakter (piksel)
+  layerHitBottom: 4,        // jarak bawah kotak tabrak dari dasar gambar karakter (piksel)
+  layerDebug: false,        // true = tampilkan kotak tabrak karakter (untuk menguji layer)
+
+  // Layer ATAS (PNG): digambar DI ATAS karakter dan TIDAK punya tabrakan (karakter bisa lewat di bawahnya).
+  // Cocok untuk tajuk pohon, atap, jembatan, kabut, dan sebagainya. Kalau file tidak ada, game jalan seperti biasa.
+  // Gambarnya harus sama ukurannya dengan layer.png (mode "map"). overlayMode: "map" | "tile" | "stretch".
+  overlayImage: "assets/layer-atas.png",
+  overlayMode: "map",
+
+  // Layer ANIMASI (PNG, beberapa frame): lapisan dekorasi yang bergerak, tanpa tabrakan (bisa dilewati).
+  // Cocok untuk air, riak, rumput bergoyang, api, kabut. Nama file: layer-animasi1.png, layer-animasi2.png, dst.
+  // Semua frame harus ada dan ukurannya sama dengan layer.png (mode "map").
+  // animLayerPosition: "belakang" = di atas latar, DI BAWAH layer.png dan karakter
+  //                    "tengah"   = DI ATAS layer.png, di bawah karakter
+  //                    "atas"     = di atas karakter, di bawah layer-atas.png
+  //                    "teratas"  = di atas karakter DAN di atas layer-atas.png (nama & chat tetap paling depan)
+  animLayerPrefix: "assets/layer-animasi",
+  animLayerFrameCount: 3,
+  animLayerFps: 4,            // kecepatan animasi (frame per detik; makin kecil makin pelan)
+  animLayerMode: "map",       // "map" | "tile" | "stretch"
+  animLayerPosition: "teratas",
+
+  worldWidth: 4096,         // ukuran peta (piksel). Saat online, ukuran dari server yang dipakai.
+  worldHeight: 4096,        // (kalau ada layer.png dengan layerMode "map", ukuran peta otomatis = ukuran layer)
 
   playerWidth: 96,          // ukuran karakter di layar
   playerHeight: 96,
@@ -22,22 +58,23 @@ const CONFIG = {
   animationFps: 10,         // kecepatan animasi berjalan
   idleFrameCount: 3,        // jumlah frame animasi diam/idle (idle1.png sampai idle3.png)
   idleFps: 4,               // kecepatan animasi idle (makin kecil makin pelan)
+  lieFrameCount: 3,         // jumlah frame animasi baring (baring1.png sampai baring3.png)
+  lieFps: 3,                // kecepatan animasi baring (makin kecil makin pelan)
   idleFrame: 0,             // dipakai hanya jika karakter TIDAK punya animasi idle (0 = frame jalan pertama)
   spriteFacesRight: true,   // true jika gambar asli menghadap KANAN
 
   chatDuration: 6000,       // lama pesan tampil di atas karakter (milidetik)
   chatFadeTime: 1000,       // lama memudar di akhir (milidetik)
+  chatVoicePitch: 1.15,     // tinggi suara gumaman chat pemain (1 = normal; NPC: 0.72 - 1.7)
   chatMaxLength: 80,        // batas jumlah huruf per pesan
   chatMaxWidth: 190,        // lebar maksimal gelembung chat (piksel)
   chatFont: "14px system-ui, sans-serif",
 
   // ---- Suara ----
-  bgmFile: "assets/audio/bgm.wav",
+  bgmFile: "",              // dikosongkan: lagu diatur musik.js (daftar MUSIK_CONFIG.lagu). Dulu menunjuk file yang tidak ada (404 tiap pemuatan).
   bgmVolume: 0.35,
-  footstepFiles: ["assets/audio/step1.wav", "assets/audio/step2.wav"],
+  footstepFile: "assets/audio/step1.wav",   // satu audio langkah, diputar LOOP selama pemain berjalan
   footstepVolume: 0.6,
-  footstepInterval: null,         // detik antar langkah; null = otomatis mengikuti animasi
-  footstepPitchVariation: 0.08,
 
   // ---- Nama karakter ----
   nameMinLength: 2,
@@ -48,7 +85,7 @@ const CONFIG = {
   // Alamat server. Saat tes di komputer sendiri: "ws://localhost:3000"
   // Setelah server di-hosting, ganti dengan alamatnya, contoh: "wss://nama-game.onrender.com"
   // Kosongkan ("") untuk bermain sendiri tanpa server.
-  serverUrl: "wss://dod-startup-fashion-rail.trycloudflare.com",
+  serverUrl: "wss://finder-synopsis-reasonably-cliff.trycloudflare.com",
   sendInterval: 66,         // jeda minimal kirim posisi (milidetik), sekitar 15 kali per detik
   remoteSmoothing: 14       // makin besar, gerak pemain lain makin cepat menyusul posisi terbaru
 };
@@ -69,21 +106,25 @@ const DEFAULT_OUTFIT = { body: { id: "", color: "#ffffff" } };   // id awal diis
 
 const STORAGE_KEY = "gamePertamaOutfit";
 const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
+const ctx = canvas.getContext("2d", { alpha: false });
 
+let maxDpr = 2;   // batas ketajaman kanvas; perf.js menurunkannya otomatis kalau perangkat terasa berat
 function resize() {
-  const dpr = window.devicePixelRatio || 1;
+  const dpr = Math.min(window.devicePixelRatio || 1, maxDpr);   // maksimal 2x supaya HP tidak terlalu berat
   canvas.width = window.innerWidth * dpr;
   canvas.height = window.innerHeight * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
-window.addEventListener("resize", resize);
+window.addEventListener("resize", () => { resize(); netSendViewSoon(); });
 resize();
 
 function loadImage(src, quiet) {
   return new Promise(resolve => {
     const img = new Image();
-    img.onload = () => resolve(img);
+    img.onload = () => {
+      // dekode sekarang, bukan saat pertama digambar (gambar 4096x4096 bisa membuat game tersendat sesaat)
+      if (img.decode) img.decode().then(() => resolve(img), () => resolve(img)); else resolve(img);
+    };
     img.onerror = () => { if (!quiet) console.warn("Gagal memuat:", src); resolve(null); };
     img.src = src;
   });
@@ -133,11 +174,13 @@ function saveOutfit() {
 
 let outfit = loadOutfit();
 const images = { body: Object.create(null) };   // images.body[id] = { walk: [frame1 ... frame6], idle: [idle1 ... idle3] }
-let composed = { walk: [], idle: [] };   // frame jadi milik pemain ini: jalan + idle
-let bgFrames = [];           // frame animasi latar yang berhasil dimuat
+let composed = { walk: [], idle: [], lie: [] };   // frame jadi milik pemain ini: jalan + idle
+let bgMode = "tile";         // cara menggambar latar yang dipakai (hasil dari CONFIG.backgroundMode)
+let bgFrames = [];           // gambar latar yang berhasil dimuat
 
 function imagePath(part, id, n) { return `assets/${part}/${id}/${n}.png`; }
 function idlePath(id, n) { return `assets/body/${id}/idle${n}.png`; }
+function liePath(id, n) { return `assets/body/${id}/baring${n}.png`; }
 
 // ---------- Membaca daftar karakter dari folder assets/body/ ----------
 function prettyName(id) { return id.replace(/[-_]+/g, " ").replace(/\b\w/g, c => c.toUpperCase()); }
@@ -220,10 +263,11 @@ function addBodyOption(id) {
 }
 function loadBody(id) {
   if (bodyLoads.has(id)) return bodyLoads.get(id);
-  const walkJobs = [], idleJobs = [];
+  const walkJobs = [], idleJobs = [], lieJobs = [];
   for (let n = 1; n <= CONFIG.frameCount; n++) walkJobs.push(loadImage(imagePath("body", id, n)));
   for (let n = 1; n <= CONFIG.idleFrameCount; n++) idleJobs.push(loadImage(idlePath(id, n), true));   // idle boleh tidak ada
-  const p = Promise.all([Promise.all(walkJobs), Promise.all(idleJobs)]).then(([walk, idleAll]) => {
+  for (let n = 1; n <= CONFIG.lieFrameCount; n++) lieJobs.push(loadImage(liePath(id, n), true));      // baring boleh tidak ada
+  const p = Promise.all([Promise.all(walkJobs), Promise.all(idleJobs), Promise.all(lieJobs)]).then(([walk, idleAll, lieAll]) => {
     if (!walk.every(Boolean)) {
       console.warn(`Karakter "${id}" dilewati: harus ada ${CONFIG.frameCount} gambar jalan (1.png sampai ${CONFIG.frameCount}.png).`);
       return false;
@@ -233,7 +277,12 @@ function loadBody(id) {
     else if (idleAll.some(Boolean)) {
       console.warn(`Animasi idle karakter "${id}" tidak dipakai: harus lengkap idle1.png sampai idle${CONFIG.idleFrameCount}.png.`);
     }
-    images.body[id] = { walk, idle };
+    let lie = [];
+    if (lieAll.every(Boolean)) lie = lieAll;
+    else if (lieAll.some(Boolean)) {
+      console.warn(`Animasi baring karakter "${id}" tidak dipakai: harus lengkap baring1.png sampai baring${CONFIG.lieFrameCount}.png.`);
+    }
+    images.body[id] = { walk, idle, lie };
     addBodyOption(id);
     return true;
   });
@@ -268,9 +317,9 @@ function composeOutfit(o) {
   const own = o.body && images.body[o.body.id];
   if (own) return own;
   const first = Object.keys(images.body)[0];
-  return first ? images.body[first] : { walk: [], idle: [] };
+  return first ? images.body[first] : { walk: [], idle: [], lie: [] };
 }
-function composeFrames() { composed = composeOutfit(outfit); }
+function composeFrames() { composed = composeOutfit(outfit); if (player.lying && !(composed.lie && composed.lie.length)) setLying(false); }
 
 const frameCache = new Map();   // kostum yang sama dipakai bersama oleh banyak pemain
 function composeCached(o) {
@@ -344,20 +393,16 @@ function saveAudioPrefs() {
   try { localStorage.setItem(AUDIO_KEY, JSON.stringify(audioPrefs)); } catch (e) {}
 }
 
-const bgm = new Audio(CONFIG.bgmFile);
+const bgm = new Audio();
+if (CONFIG.bgmFile) bgm.src = CONFIG.bgmFile;
 bgm.loop = true;
 bgm.volume = CONFIG.bgmVolume;
-bgm.preload = "auto";
+bgm.preload = "metadata";   // lagu diunduh penuh saat diputar, bukan saat game dibuka
 
-const stepSounds = CONFIG.footstepFiles.map(f => {
-  const a = new Audio(f);
-  a.preload = "auto";
-  a.volume = CONFIG.footstepVolume;
-  a.preservesPitch = false; a.mozPreservesPitch = false; a.webkitPreservesPitch = false;
-  return a;
-});
-let stepIndex = 0;
-let stepTimer = 0;
+const stepSound = new Audio(CONFIG.footstepFile);   // satu audio langkah, loop
+stepSound.preload = "auto";
+stepSound.loop = true;
+stepSound.volume = CONFIG.footstepVolume;
 let audioStarted = false;
 
 const btnMusic = document.getElementById("btnMusic");
@@ -401,22 +446,21 @@ refreshAudioButtons();
 if (!audioPrefs.music) audioHint.textContent = "🔇 Musik mati (klik 🎵 Musik untuk menyalakan)";
 
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden) bgm.pause();
+  if (document.hidden) { bgm.pause(); stepSound.pause(); }
   else if (audioStarted && audioPrefs.music) bgm.play().catch(() => {});
+  netSend({ t: "vis", v: document.hidden ? 0 : 1 });   // tab tersembunyi: server berhenti mengirim posisi (hemat bandwidth)
 });
 
-function playStep() {
-  if (!audioPrefs.sfx || !audioStarted || !stepSounds.length) return;
-  const a = stepSounds[stepIndex];
-  stepIndex = (stepIndex + 1) % stepSounds.length;
-  const v = CONFIG.footstepPitchVariation;
-  a.playbackRate = 1 + (Math.random() * 2 - 1) * v;
-  a.volume = CONFIG.footstepVolume * (0.85 + Math.random() * 0.15);
-  a.currentTime = 0;
-  a.play().catch(() => {});
-}
-function footstepInterval() {
-  return CONFIG.footstepInterval || (CONFIG.frameCount / CONFIG.animationFps) / 2;
+// Suara langkah: satu audio yang berputar (loop) selama pemain berjalan,
+// berhenti saat pemain berhenti, dan mulai dari awal lagi saat berjalan kembali.
+function setStepSound(walking) {
+  const shouldPlay = walking && audioPrefs.sfx && audioStarted;
+  if (shouldPlay) {
+    if (stepSound.paused) { stepSound.currentTime = 0; stepSound.play().catch(() => {}); }
+  } else if (!stepSound.paused) {
+    stepSound.pause();
+    stepSound.currentTime = 0;
+  }
 }
 
 // ---------- Gambar nama & gelembung chat ----------
@@ -434,13 +478,23 @@ function roundedRectPath(x, y, w, h, r) {
 function nameTagTop(py) {
   return py - CONFIG.playerHeight / 2 + 2 - NAME_TAG_HEIGHT;   // tepat di atas kepala
 }
+const nameWidthCache = new Map();   // measureText mahal; lebar nama hampir tidak pernah berubah
+function nameWidth(name) {
+  let w = nameWidthCache.get(name);
+  if (w === undefined) {
+    if (nameWidthCache.size > 300) nameWidthCache.clear();
+    w = ctx.measureText(name).width;
+    nameWidthCache.set(name, w);
+  }
+  return w;
+}
 function drawNameTag(px, py, name) {
   if (!name) return;
   ctx.save();
   ctx.font = CONFIG.nameFont;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  const boxW = ctx.measureText(name).width + 16;
+  const boxW = nameWidth(name) + 16;
   const top = nameTagTop(py);
   roundedRectPath(px - boxW / 2, top, boxW, NAME_TAG_HEIGHT, NAME_TAG_HEIGHT / 2);
   ctx.fillStyle = "rgba(0,0,0,0.55)";
@@ -483,8 +537,11 @@ function drawChatBubble(px, py, viewW, name, msg) {
   ctx.textBaseline = "middle";
   ctx.textAlign = "left";
   const pad = 8, lineH = 18, tail = 8;
-  const lines = wrapText(msg.text, CONFIG.chatMaxWidth);
-  const textW = Math.max(...lines.map(l => ctx.measureText(l).width));
+  if (!msg.lines) {                                  // hitung pemecahan baris sekali per pesan, bukan tiap frame
+    msg.lines = wrapText(msg.text, CONFIG.chatMaxWidth);
+    msg.textW = Math.max(...msg.lines.map(l => ctx.measureText(l).width));
+  }
+  const lines = msg.lines, textW = msg.textW;
   const boxW = textW + pad * 2;
   const boxH = lines.length * lineH + pad * 2;
 
@@ -534,6 +591,7 @@ chatForm.addEventListener("submit", e => {
   if (text) {
     chatMessage = { text, time: performance.now() };
     netSend({ t: "chat", text });
+    if (typeof Suara !== "undefined") Suara.talk(player.x, player.y, text, CONFIG.chatVoicePitch);   // suara gumaman seperti NPC (suara.js)
   }
   chatInput.value = "";
   chatInput.blur();       // kembali ke mode gerak
@@ -606,6 +664,7 @@ window.addEventListener("keydown", e => {
     chatInput.focus();
     return;
   }
+  if (e.code === "KeyB" && !e.repeat) { toggleLie(); return; }
   keys[e.code] = true;
   if (e.code.startsWith("Arrow")) e.preventDefault();
 });
@@ -626,9 +685,34 @@ document.querySelectorAll("#dpad button").forEach(btn => {
 const player = {
   x: CONFIG.worldWidth / 2 + (Math.random() * 400 - 200),   // muncul acak di sekitar tengah
   y: CONFIG.worldHeight / 2 + (Math.random() * 400 - 200),
-  facingLeft: false, moving: false
+  facingLeft: false, moving: false, lying: false
 };
 let animTime = 0;
+
+// ---------- Baring ----------
+// Tekan B atau tombol "Baring" di menu Setting untuk berbaring / bangun.
+// Bergerak (jalan) otomatis membuat karakter bangun. Hanya bisa jika karakter punya baring1-3.png.
+let lieWarned = false;
+function setLying(on) {
+  if (on === player.lying) return;
+  if (on && !(composed.lie && composed.lie.length)) {
+    if (!lieWarned) { console.warn("Karakter ini belum punya animasi baring (baring1.png sampai baring" + CONFIG.lieFrameCount + ".png)."); lieWarned = true; }
+    return;
+  }
+  player.lying = on;
+  animTime = 0;
+  const b = document.getElementById("btnLie");
+  if (b) b.classList.toggle("lieOn", on);
+}
+function toggleLie() { setLying(!player.lying); }
+{
+  const lieBtn = document.getElementById("btnLie");
+  if (lieBtn) lieBtn.addEventListener("click", () => {
+    toggleLie();
+    const m = document.getElementById("settingsMenu");
+    if (m) m.classList.remove("open");
+  });
+}
 
 // ---------- Multiplayer ----------
 const remotePlayers = new Map();   // id -> pemain lain
@@ -644,87 +728,6 @@ let lastSent = null;
 let sendTimer = 0;
 let outfitSendTimer = null;
 
-// ---------- Papan skor (semua pemain online) ----------
-// jumlah baris papan skor menyesuaikan ukuran layar
-function boardMaxRows() {
-  if (window.innerHeight <= 500) return 3;
-  if (window.innerWidth <= 600) return 5;
-  return 10;
-}
-const boardStyle = document.createElement("style");
-boardStyle.textContent = `
-#scoreBoard{position:fixed;left:calc(8px + env(safe-area-inset-left,0px));width:210px;box-sizing:border-box;background:rgba(0,0,0,.55);color:#fff;
-  border-radius:10px;padding:8px 10px;font-size:13px;pointer-events:none;z-index:5;display:none}
-#scoreBoard .sbTitle{font-weight:700;margin-bottom:4px}
-#scoreBoard .sbRow{display:grid;grid-template-columns:28px 1fr auto;gap:6px;padding:2px 4px;border-radius:6px;align-items:center}
-#scoreBoard .sbRow.me{background:rgba(59,130,246,.6);font-weight:700}
-#scoreBoard .sbRank{text-align:center}
-#scoreBoard .sbRow.r1{font-size:15px;color:#ffd54a}
-#scoreBoard .sbRow.r2{color:#e0e0e0}
-#scoreBoard .sbRow.r3{color:#e8a56a}
-#scoreBoard .sbName{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#scoreBoard .sbMore{opacity:.7;padding:2px 4px}
-@media (max-width:600px){#scoreBoard{width:158px;font-size:12px;padding:6px 8px}
-  #scoreBoard .sbRow{grid-template-columns:24px 1fr auto;gap:4px}}
-@media (max-height:500px){#scoreBoard{font-size:11px;padding:5px 7px}}`;
-document.head.appendChild(boardStyle);
-const boardEl = document.createElement("div");
-boardEl.id = "scoreBoard";
-document.body.appendChild(boardEl);
-let boardKey = "";
-
-function renderBoard() {
-  if (!netReady) { boardEl.style.display = "none"; boardKey = ""; return; }
-  const infoEl = document.getElementById("info");
-  boardEl.style.top = ((infoEl ? infoEl.getBoundingClientRect().bottom : 0) + 6) + "px";
-  boardEl.style.display = "block";
-
-  const all = [{ id: myId, name: playerName, score: typeof Ayam !== "undefined" ? Ayam.caught : 0, me: true }];
-  remotePlayers.forEach(r => all.push({ id: r.id, name: r.name, score: r.score || 0, me: false }));
-  all.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name) || a.id - b.id);
-  let rank = 0, prev = null;                       // skor sama = peringkat sama
-  all.forEach((p, i) => { if (p.score !== prev) { rank = i + 1; prev = p.score; } p.rank = rank; });
-
-  const maxRows = boardMaxRows();
-  let shown = all.slice(0, maxRows);
-  if (all.length > maxRows && !shown.some(p => p.me)) {   // pastikan baris saya selalu terlihat
-    shown = all.slice(0, maxRows - 1);
-    shown.push(all.find(p => p.me));
-  }
-  const hidden = all.length - shown.length;
-  const key = JSON.stringify([shown.map(p => [p.rank, p.name, p.score, p.me]), hidden]);
-  if (key === boardKey) return;                    // tidak ada perubahan
-  boardKey = key;
-
-  boardEl.textContent = "";
-  const title = document.createElement("div");
-  title.className = "sbTitle";
-  title.textContent = "🏆 Papan Skor";
-  boardEl.appendChild(title);
-  const medals = ["🥇", "🥈", "🥉"];
-  for (const p of shown) {
-    const row = document.createElement("div");
-    row.className = "sbRow" + (p.me ? " me" : "") + (p.score > 0 && p.rank <= 3 ? " r" + p.rank : "");
-    const r = document.createElement("span");
-    r.className = "sbRank";
-    r.textContent = p.score > 0 && p.rank <= 3 ? medals[p.rank - 1] : p.rank + ".";
-    const n = document.createElement("span");
-    n.className = "sbName";
-    n.textContent = p.name + (p.me ? " (Anda)" : "");
-    const s = document.createElement("span");
-    s.textContent = "🐔 " + p.score;
-    row.append(r, n, s);
-    boardEl.appendChild(row);
-  }
-  if (hidden > 0) {
-    const more = document.createElement("div");
-    more.className = "sbMore";
-    more.textContent = "… dan " + hidden + " pemain lain";
-    boardEl.appendChild(more);
-  }
-}
-setInterval(renderBoard, 300);
-
 function updateNetStatus() {
   let text;
   if (!CONFIG.serverUrl) text = "👤 Mode sendiri (offline)";
@@ -737,6 +740,13 @@ function updateNetStatus() {
 function netSend(obj) {
   if (socket && socket.readyState === 1 && netReady) socket.send(JSON.stringify(obj));
 }
+// Server hanya mengirim posisi pemain/kupu-kupu yang dekat layar kita, jadi server perlu tahu ukuran layar.
+function viewRadius() { return Math.hypot(window.innerWidth, window.innerHeight) / 2; }
+let viewTimer = null;
+function netSendViewSoon() {
+  if (viewTimer) return;
+  viewTimer = setTimeout(() => { viewTimer = null; netSend({ t: "view", r: Math.round(viewRadius()) }); }, 500);
+}
 function netSendOutfit() {            // ditunda sebentar agar tidak mengirim ratusan kali saat geser warna
   if (!CONFIG.serverUrl || outfitSendTimer) return;
   outfitSendTimer = setTimeout(() => {
@@ -747,7 +757,8 @@ function netSendOutfit() {            // ditunda sebentar agar tidak mengirim ra
 
 function scheduleReconnect() {
   if (reconnectTimer || netBlocked || !CONFIG.serverUrl) return;
-  reconnectTimer = setTimeout(() => { reconnectTimer = null; netConnect(); }, reconnectDelay);
+  const wait = reconnectDelay * (0.6 + Math.random() * 0.8);   // acak +-40%: pemain tidak menyambung serentak setelah server hidup lagi
+  reconnectTimer = setTimeout(() => { reconnectTimer = null; netConnect(); }, wait);
   reconnectDelay = Math.min(reconnectDelay * 2, 10000);
 }
 
@@ -761,7 +772,8 @@ function netConnect() {
   ws.onopen = () => {
     ws.send(JSON.stringify({
       t: "join", name: playerName, outfit,
-      x: Math.round(player.x), y: Math.round(player.y), l: player.facingLeft ? 1 : 0
+      x: Math.round(player.x), y: Math.round(player.y), l: player.facingLeft ? 1 : 0,
+      vr: viewRadius()
     }));
   };
   ws.onmessage = ev => {
@@ -774,7 +786,8 @@ function netConnect() {
     netReady = false;
     myId = null;
     remotePlayers.clear();
-    if (typeof Ayam !== "undefined") Ayam.leaveServer();
+    if (typeof Npc !== "undefined") Npc.netLost();
+    if (typeof Kupu !== "undefined") Kupu.netLost();
     if (!netNote) netNote = "Tidak terhubung ke server";
     updateNetStatus();
     scheduleReconnect();
@@ -791,8 +804,7 @@ function addRemote(p) {
   const x = Number.isFinite(p.x) ? p.x : 0, y = Number.isFinite(p.y) ? p.y : 0;
   remotePlayers.set(p.id, {
     id: p.id, name, outfit: o, frames: composeCached(o),
-    x, y, tx: x, ty: y, left: !!p.l, moving: !!p.m, wasMoving: !!p.m, animTime: 0, chat: null,
-    score: Number.isFinite(p.s) ? p.s : 0
+    x, y, tx: x, ty: y, left: !!p.l, moving: !!p.m, lying: !!p.z, wasLying: !!p.z, wasMoving: !!p.m, animTime: 0, chat: null,
   });
 }
 
@@ -802,27 +814,25 @@ function handleNetMessage(msg) {
       myId = msg.id;
       const w = msg.world;
       if (w && w.w > 0 && w.w <= 20000 && w.h > 0 && w.h <= 20000) {
-        CONFIG.worldWidth = w.w; CONFIG.worldHeight = w.h;
-        player.x = Math.max(0, Math.min(w.w, player.x));
-        player.y = Math.max(0, Math.min(w.h, player.y));
+        const mw = layerImg && CONFIG.layerMode === "map" ? layerW : (bgFrames[0] && bgMode === "map" ? bgFrames[0].width : 0);
+        const mh = layerImg && CONFIG.layerMode === "map" ? layerH : (bgFrames[0] && bgMode === "map" ? bgFrames[0].height : 0);
+        if (mw && (w.w !== mw || w.h !== mh))
+          console.warn(`Ukuran peta server (${w.w}x${w.h}) beda dengan gambar (${mw}x${mh}). Game memakai ukuran gambar. Atur WORLD_WIDTH/WORLD_HEIGHT di server = ukuran gambar (atau update server.js lalu jalankan ulang).`);
+        if (!mw) { CONFIG.worldWidth = w.w; CONFIG.worldHeight = w.h; }   // ada gambar peta: ukuran gambar yang dipakai, bukan ukuran dari server
+        else { CONFIG.worldWidth = mw; CONFIG.worldHeight = mh; }
+        player.x = Math.max(0, Math.min(CONFIG.worldWidth, player.x));
+        player.y = Math.max(0, Math.min(CONFIG.worldHeight, player.y));
       }
       remotePlayers.clear();
       if (Array.isArray(msg.players)) msg.players.forEach(addRemote);
-      if (typeof Ayam !== "undefined") Ayam.setFromServer(msg.chickens);   // ayam dari server (ayam.js)
+      if (typeof Npc !== "undefined") Npc.netWelcome(msg.npcs);      // NPC dari server (sama untuk semua pemain)
+      if (typeof Kupu !== "undefined") Kupu.netWelcome(msg.kupu);    // kupu-kupu dari server
       netReady = true;
       netNote = "";
       reconnectDelay = 1000;
       lastSent = null;
+      if (document.hidden) netSend({ t: "vis", v: 0 });
       updateNetStatus();
-      break;
-    }
-    case "ck": if (typeof Ayam !== "undefined") Ayam.applyServer(msg.c); break;
-    case "caught": {
-      if (msg.by !== myId) {                                  // pemain lain menangkap: catat skornya
-        const r = remotePlayers.get(msg.by);
-        if (r && Number.isFinite(msg.score)) r.score = msg.score;
-      }
-      if (typeof Ayam !== "undefined") Ayam.onCaught(msg, myId);
       break;
     }
     case "join": addRemote(msg.player); updateNetStatus(); break;
@@ -833,15 +843,23 @@ function handleNetMessage(msg) {
           if (!Array.isArray(e) || e[0] === myId) continue;
           const r = remotePlayers.get(e[0]);
           if (!r || !Number.isFinite(e[1]) || !Number.isFinite(e[2])) continue;
-          r.tx = e[1]; r.ty = e[2]; r.left = !!e[3]; r.moving = !!e[4];
+          r.tx = e[1]; r.ty = e[2]; r.left = !!e[3]; r.moving = !!e[4]; r.lying = !!e[5];
         }
       }
       break;
     case "chat": {
       const r = remotePlayers.get(msg.id);
-      if (r && typeof msg.text === "string") r.chat = { text: msg.text.slice(0, CONFIG.chatMaxLength), time: performance.now() };
+      if (r && typeof msg.text === "string") {
+        r.chat = { text: msg.text.slice(0, CONFIG.chatMaxLength), time: performance.now() };
+        if (typeof Suara !== "undefined") {           // pemain lain: suara makin pelan kalau makin jauh; tinggi suara tetap per pemain
+          let h = 0; for (const c of String(msg.id)) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+          Suara.talk(r.x, r.y, r.chat.text, 0.8 + (h % 9) * 0.1);
+        }
+      }
       break;
     }
+    case "npc": case "npcsay": if (typeof Npc !== "undefined") Npc.net(msg); break;
+    case "kp": case "kc": case "km": case "kz": if (typeof Kupu !== "undefined") Kupu.net(msg); break;
     case "outfit": {
       const r = remotePlayers.get(msg.id), o = validOutfit(msg.outfit);
       if (r && o) { prepareOutfit(o); r.outfit = o; r.frames = composeCached(o); }
@@ -865,47 +883,141 @@ function handleNetMessage(msg) {
 }
 
 // ---------- Update ----------
+// ---------- Layer rintangan (collision dari PNG) ----------
+let layerImg = null;        // gambar layer
+let layerMask = null;       // Uint8Array: 1 = terisi (tabrakan), 0 = bolong
+let layerW = 0, layerH = 0;
+
+function buildLayerMask(img) {
+  layerImg = img; layerW = img.width; layerH = img.height;
+  try {
+    const band = 256;                                 // dibaca per potongan supaya hemat memori (layer besar)
+    const c = document.createElement("canvas");
+    c.width = layerW; c.height = Math.min(band, layerH);
+    const g = c.getContext("2d", { willReadFrequently: true });
+    const mask = new Uint8Array(layerW * layerH);
+    let solid = 0;
+    for (let y0 = 0; y0 < layerH; y0 += band) {
+      const hh = Math.min(band, layerH - y0);
+      g.clearRect(0, 0, layerW, c.height);
+      g.drawImage(img, 0, y0, layerW, hh, 0, 0, layerW, hh);
+      const d = g.getImageData(0, 0, layerW, hh).data;
+      for (let i = 0, n = layerW * hh; i < n; i++) {
+        const v = d[i * 4 + 3] > CONFIG.layerAlphaMin ? 1 : 0;
+        mask[y0 * layerW + i] = v; solid += v;
+      }
+    }
+    layerMask = mask;
+    console.info(`Layer dimuat: ${layerW}x${layerH}, ${(solid / mask.length * 100).toFixed(1)}% terisi (tabrakan aktif)`);
+    if (solid === 0) console.warn("Layer tidak punya bagian terisi (semuanya transparan), jadi tidak ada tabrakan.");
+  } catch (e) {
+    layerMask = null;       // biasanya karena game dibuka langsung dari file (bukan lewat server)
+    console.warn("Layer tidak bisa dipakai untuk tabrakan (buka game lewat server/localhost):", e.message || e);
+  }
+}
+
+function layerSolidAt(x, y) {       // titik dunia (x, y) menabrak bagian terisi?
+  if (!layerMask) return false;
+  let u, v;
+  if (CONFIG.layerMode === "map") {
+    u = Math.floor(x); v = Math.floor(y);
+    if (u < 0 || v < 0 || u >= layerW || v >= layerH) return false;
+  } else if (CONFIG.layerMode === "stretch") {
+    u = Math.floor(x / CONFIG.worldWidth * layerW);
+    v = Math.floor(y / CONFIG.worldHeight * layerH);
+    if (u < 0 || v < 0 || u >= layerW || v >= layerH) return false;
+  } else {
+    u = ((Math.floor(x) % layerW) + layerW) % layerW;
+    v = ((Math.floor(y) % layerH) + layerH) % layerH;
+  }
+  return layerMask[v * layerW + u] === 1;
+}
+
+// kotak tabrak ada di kaki karakter; (px, py) = titik tengah karakter
+function hitBox(px, py) {
+  const hw = CONFIG.layerHitWidth / 2, hh = CONFIG.layerHitHeight;
+  const bottom = py + CONFIG.playerHeight / 2 - CONFIG.layerHitBottom;
+  return { l: px - hw, r: px + hw, t: bottom - hh, b: bottom };
+}
+function blockedAt(px, py) {
+  if (!layerMask) return false;
+  const bx = hitBox(px, py), step = 8;
+  for (let y = bx.t; ; y += step) {
+    const yy = Math.min(y, bx.b);
+    for (let x = bx.l; ; x += step) {
+      const xx = Math.min(x, bx.r);
+      if (layerSolidAt(xx, yy)) return true;
+      if (xx >= bx.r) break;
+    }
+    if (yy >= bx.b) break;
+  }
+  return false;
+}
+// gerakkan pemain; berhenti/menyusur kalau menabrak bagian terisi pada layer
+function moveWithCollision(mx, my) {
+  if (!layerMask) { player.x += mx; player.y += my; return; }
+  const n = Math.max(1, Math.ceil(Math.max(Math.abs(mx), Math.abs(my)) / 4));
+  const sx = mx / n, sy = my / n;
+  const halfW = CONFIG.playerWidth / 2, halfH = CONFIG.playerHeight / 2;
+  for (let i = 0; i < n; i++) {
+    const stuck = blockedAt(player.x, player.y);     // sudah terjebak di dalam rintangan: boleh keluar bebas
+    const nx = Math.max(halfW, Math.min(CONFIG.worldWidth - halfW, player.x + sx));
+    if (stuck || !blockedAt(nx, player.y)) player.x = nx;
+    const ny = Math.max(halfH, Math.min(CONFIG.worldHeight - halfH, player.y + sy));
+    if (stuck || !blockedAt(player.x, ny)) player.y = ny;
+  }
+}
+
+// kalau titik muncul tepat di dalam tembok, geser ke tempat kosong terdekat (spiral)
+function placeOnFreeSpot() {
+  if (!layerMask || !blockedAt(player.x, player.y)) return;
+  const ox = player.x, oy = player.y;
+  for (let r = 16; r <= 1200; r += 16) {
+    for (let a = 0; a < 360; a += 15) {
+      const x = ox + Math.cos(a * Math.PI / 180) * r, y = oy + Math.sin(a * Math.PI / 180) * r;
+      if (x < 48 || y < 48 || x > CONFIG.worldWidth - 48 || y > CONFIG.worldHeight - 48) continue;
+      if (!blockedAt(x, y)) { player.x = x; player.y = y; return; }
+    }
+  }
+}
+
 function update(dt) {
   let dx = 0, dy = 0;
   if (keys.ArrowLeft || keys.KeyA || touch.left) dx -= 1;
   if (keys.ArrowRight || keys.KeyD || touch.right) dx += 1;
   if (keys.ArrowUp || keys.KeyW || touch.up) dy -= 1;
   if (keys.ArrowDown || keys.KeyS || touch.down) dy += 1;
-  if (typeof Ayam !== "undefined" && Ayam.frozen) { dx = 0; dy = 0; }   // jeda setelah menangkap ayam (ayam.js)
+  if (typeof Kupu !== "undefined" && Kupu.frozen) { dx = 0; dy = 0; }   // sedang mengayun jaring: diam
 
   if (dx !== 0 && dy !== 0) { dx *= Math.SQRT1_2; dy *= Math.SQRT1_2; }
   if (dx < 0) player.facingLeft = true;
   if (dx > 0) player.facingLeft = false;
 
+  if ((dx !== 0 || dy !== 0) && player.lying) { player.lying = false; animTime = 0;
+    const lb = document.getElementById("btnLie"); if (lb) lb.classList.remove("lieOn"); }   // jalan = bangun
   const wasMoving = player.moving;
   player.moving = (dx !== 0 || dy !== 0);
   if (player.moving !== wasMoving) animTime = 0;   // ganti dari diam ke jalan (atau sebaliknya): animasi mulai dari awal
   animTime += dt;
 
   const oldX = player.x, oldY = player.y;
-  player.x += dx * CONFIG.speed * dt;
-  player.y += dy * CONFIG.speed * dt;
+  moveWithCollision(dx * CONFIG.speed * dt, dy * CONFIG.speed * dt);
 
   const halfW = CONFIG.playerWidth / 2, halfH = CONFIG.playerHeight / 2;
   player.x = Math.max(halfW, Math.min(CONFIG.worldWidth - halfW, player.x));
   player.y = Math.max(halfH, Math.min(CONFIG.worldHeight - halfH, player.y));
 
-  // suara langkah: hanya saat benar-benar berpindah
+  // suara langkah: loop selama benar-benar berpindah, berhenti saat diam
   const moved = player.x !== oldX || player.y !== oldY;
-  if (moved) {
-    stepTimer -= dt;
-    if (stepTimer <= 0) { playStep(); stepTimer = footstepInterval(); }
-  } else {
-    stepTimer = 0;
-  }
+  setStepSound(moved);
 
   // kirim posisi ke server (hanya jika berubah, dan tidak lebih sering dari sendInterval)
   sendTimer += dt * 1000;
   if (netReady) {
-    const st = { x: Math.round(player.x), y: Math.round(player.y), l: player.facingLeft ? 1 : 0, m: player.moving ? 1 : 0 };
-    const changed = !lastSent || st.x !== lastSent.x || st.y !== lastSent.y || st.l !== lastSent.l || st.m !== lastSent.m;
+    const st = { x: Math.round(player.x), y: Math.round(player.y), l: player.facingLeft ? 1 : 0, m: player.moving ? 1 : 0, z: player.lying ? 1 : 0 };
+    const changed = !lastSent || st.x !== lastSent.x || st.y !== lastSent.y || st.l !== lastSent.l || st.m !== lastSent.m || st.z !== lastSent.z;
     if (changed && sendTimer >= CONFIG.sendInterval) {
-      netSend({ t: "move", x: st.x, y: st.y, l: st.l, m: st.m });
+      netSend({ t: "move", x: st.x, y: st.y, l: st.l, m: st.m, z: st.z });
       lastSent = st;
       sendTimer = 0;
     }
@@ -917,34 +1029,152 @@ function update(dt) {
     if (Math.abs(r.tx - r.x) > 400 || Math.abs(r.ty - r.y) > 400) { r.x = r.tx; r.y = r.ty; }
     else { r.x += (r.tx - r.x) * a; r.y += (r.ty - r.y) * a; }
     if (r.moving !== r.wasMoving) { r.animTime = 0; r.wasMoving = r.moving; }
+    if (r.lying !== r.wasLying) { r.animTime = 0; r.wasLying = r.lying; }
     r.animTime += dt;
   }
 
-  if (typeof Ayam !== "undefined") Ayam.update(dt);   // gerakkan ayam & cek tangkapan (ayam.js)
 }
 
 // ---------- Gambar ----------
 function currentBg() {
-  const n = bgFrames.length;
-  if (!n) return null;
-  if (n === 1 || !CONFIG.backgroundFps) return bgFrames[0];
-  return bgFrames[Math.floor(performance.now() / 1000 * CONFIG.backgroundFps) % n];
+  return bgFrames[0] || null;
 }
-function drawBackground(camX, camY, viewW, viewH) {
-  const bgImg = currentBg();
-  if (!bgImg) { ctx.fillStyle = "#5a8f55"; ctx.fillRect(0, 0, viewW, viewH); return; }
-  ctx.fillStyle = CONFIG.backgroundColor;      // warna dasar: terlihat di bagian gambar yang transparan
-  ctx.fillRect(0, 0, viewW, viewH);
-  if (CONFIG.backgroundMode === "stretch") {
-    ctx.drawImage(bgImg, -camX, -camY, CONFIG.worldWidth, CONFIG.worldHeight);
+function drawOnce(img, camX, camY, viewW, viewH) {   // satu file menutupi peta; gambar hanya bagian yang terlihat
+  const sx = Math.max(0, Math.floor(camX)), sy = Math.max(0, Math.floor(camY));
+  const sw = Math.min(img.width - sx, Math.ceil(viewW) + 2), sh = Math.min(img.height - sy, Math.ceil(viewH) + 2);
+  if (sw > 0 && sh > 0) ctx.drawImage(img, sx, sy, sw, sh, sx - camX, sy - camY, sw, sh);
+}
+function drawLayer(camX, camY, viewW, viewH) {
+  if (CONFIG.layerMode === "map") drawOnce(layerImg, camX, camY, viewW, viewH);
+  else drawTiled(layerImg, camX, camY, viewW, viewH, CONFIG.layerMode);
+}
+let overlayImg = null;       // layer atas (di atas karakter, tanpa tabrakan)
+let animLayerFrames = [];    // layer animasi (dekorasi bergerak, tanpa tabrakan)
+// Tombol "Animasi" di menu Setting: hidupkan / matikan layer animasi (pilihan diingat)
+const ANIM_KEY = "gamePertamaAnimLayer";
+let animLayerOn = true;
+try { if (localStorage.getItem(ANIM_KEY) === "0") animLayerOn = false; } catch (e) {}
+(function () {
+  const menu = document.getElementById("settingsMenu");
+  if (!menu) return;
+  const btn = document.createElement("button");
+  btn.id = "btnAnimLayer";
+  btn.title = "Layer animasi (air, rumput, dll.)";
+  btn.innerHTML = '<span>🌊</span><span class="tx"> Animasi</span>';
+  menu.insertBefore(btn, document.getElementById("btnName") || null);
+  const refresh = () => btn.classList.toggle("off", !animLayerOn);
+  btn.addEventListener("click", () => {
+    animLayerOn = !animLayerOn;
+    try { localStorage.setItem(ANIM_KEY, animLayerOn ? "1" : "0"); } catch (e) {}
+    refresh();
+  });
+  refresh();
+})();
+function drawAnimLayer(camX, camY, viewW, viewH) {
+  const n = animLayerFrames.length;
+  if (!n || !animLayerOn) return;
+  const img = animLayerFrames[Math.floor(performance.now() / 1000 * CONFIG.animLayerFps) % n];
+  if (img.tiles) {                                  // layer sudah dipotong jadi kotak kecil: gambar yang terlihat saja
+    const cx = Math.round(camX), cy = Math.round(camY);
+    for (const t of img.tiles) {
+      const w = t.c.width, h = t.c.height;
+      if (t.x + w < cx || t.x > cx + viewW || t.y + h < cy || t.y > cy + viewH) continue;
+      ctx.drawImage(t.c, t.x - cx, t.y - cy);
+    }
     return;
   }
-  const w = bgImg.width, h = bgImg.height;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(-camX, -camY, CONFIG.worldWidth, CONFIG.worldHeight);
+  ctx.clip();
+  if (CONFIG.animLayerMode === "map") drawOnce(img, camX, camY, viewW, viewH);
+  else drawTiled(img, camX, camY, viewW, viewH, CONFIG.animLayerMode);
+  ctx.restore();
+}
+// Memotong gambar besar jadi kotak 256x256 dan hanya menyimpan kotak yang ada isinya.
+// Hasilnya jauh lebih ringan di memori/GPU, dan pergantian frame tidak membuat game tersendat.
+async function tileFrame(img) {
+  const T = 256, W = img.width, H = img.height;
+  const band = document.createElement("canvas");
+  band.width = W; band.height = T;
+  const g = band.getContext("2d", { willReadFrequently: true });
+  const tiles = [];
+  for (let y0 = 0; y0 < H; y0 += T) {
+    const hh = Math.min(T, H - y0);
+    g.clearRect(0, 0, W, T);
+    g.drawImage(img, 0, y0, W, hh, 0, 0, W, hh);
+    const d = g.getImageData(0, 0, W, hh).data;
+    for (let x0 = 0; x0 < W; x0 += T) {
+      const ww = Math.min(T, W - x0);
+      let any = false;
+      for (let yy = 0; yy < hh && !any; yy++) {
+        let i = (yy * W + x0) * 4 + 3;
+        for (let xx = 0; xx < ww; xx++, i += 4) if (d[i]) { any = true; break; }
+      }
+      if (!any) continue;
+      const c = document.createElement("canvas");
+      c.width = ww; c.height = hh;
+      c.getContext("2d").drawImage(band, x0, 0, ww, hh, 0, 0, ww, hh);
+      tiles.push({ x: x0, y: y0, c });
+    }
+    await new Promise(r => setTimeout(r));
+  }
+  return { width: W, height: H, tiles };
+}
+async function loadAnimLayer() {
+  const jobs = [];
+  for (let n = 1; n <= CONFIG.animLayerFrameCount; n++) jobs.push(loadImage(`${CONFIG.animLayerPrefix}${n}.png`, true));
+  const all = await Promise.all(jobs);
+  if (all.every(Boolean)) {
+    if (CONFIG.animLayerMode !== "map") return all;
+    try {
+      const out = [];
+      for (const img of all) out.push(await tileFrame(img));
+      console.info("Layer animasi dipotong: " + out.map(f => f.tiles.length + " kotak").join(", "));
+      return out;
+    } catch (e) {
+      console.warn("Gagal memotong layer animasi, pakai gambar utuh:", e.message || e);
+      return all;
+    }
+  }
+  if (all.some(Boolean))
+    console.warn(`Layer animasi tidak dipakai: harus lengkap ${CONFIG.animLayerPrefix}1.png sampai ${CONFIG.animLayerPrefix}${CONFIG.animLayerFrameCount}.png.`);
+  return [];
+}
+function drawOverlay(camX, camY, viewW, viewH) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(-camX, -camY, CONFIG.worldWidth, CONFIG.worldHeight);
+  ctx.clip();
+  if (CONFIG.overlayMode === "map") drawOnce(overlayImg, camX, camY, viewW, viewH);
+  else drawTiled(overlayImg, camX, camY, viewW, viewH, CONFIG.overlayMode);
+  ctx.restore();
+}
+function drawTiled(img, camX, camY, viewW, viewH, mode) {
+  if ((mode || bgMode) === "stretch") {
+    ctx.drawImage(img, -camX, -camY, CONFIG.worldWidth, CONFIG.worldHeight);
+    return;
+  }
+  const w = img.width, h = img.height;
   const startX = -((camX % w) + w) % w;
   const startY = -((camY % h) + h) % h;
   for (let x = startX; x < viewW; x += w)
     for (let y = startY; y < viewH; y += h)
-      ctx.drawImage(bgImg, Math.floor(x), Math.floor(y), w, h);
+      ctx.drawImage(img, Math.floor(x), Math.floor(y), w, h);
+}
+function drawBackground(camX, camY, viewW, viewH) {
+  const bgImg = currentBg();
+  if (!bgImg) { ctx.fillStyle = "#5a8f55"; ctx.fillRect(0, 0, viewW, viewH); }
+  else {
+    ctx.fillStyle = CONFIG.backgroundColor;      // warna dasar: terlihat di bagian gambar yang transparan
+    ctx.fillRect(0, 0, viewW, viewH);
+    if (bgMode === "map") drawOnce(bgImg, camX, camY, viewW, viewH);
+    else drawTiled(bgImg, camX, camY, viewW, viewH);
+  }
+  const animPos = CONFIG.animLayerPosition;
+  if (animLayerFrames.length && animPos === "belakang") drawAnimLayer(camX, camY, viewW, viewH);   // animasi di bawah layer.png
+  if (layerImg) drawLayer(camX, camY, viewW, viewH);   // layer rintangan di atas latar
+  if (animLayerFrames.length && animPos === "tengah") drawAnimLayer(camX, camY, viewW, viewH);     // animasi di atas layer.png, di bawah karakter
 }
 
 function drawSprite(c, px, py) {
@@ -952,7 +1182,8 @@ function drawSprite(c, px, py) {
   const set = c.frames, n = set.walk.length;
   if (!n) { ctx.fillStyle = "#e33"; ctx.fillRect(px - w / 2, py - h / 2, w, h); return; }
   let frame;
-  if (c.moving) frame = set.walk[Math.floor(c.animTime * CONFIG.animationFps) % n];
+  if (c.lying && set.lie && set.lie.length) frame = set.lie[Math.floor(c.animTime * CONFIG.lieFps) % set.lie.length];
+  else if (c.moving) frame = set.walk[Math.floor(c.animTime * CONFIG.animationFps) % n];
   else if (set.idle.length) frame = set.idle[Math.floor(c.animTime * CONFIG.idleFps) % set.idle.length];
   else frame = set.walk[Math.min(CONFIG.idleFrame, n - 1)];
   ctx.save();
@@ -983,9 +1214,10 @@ function draw() {
   // semua karakter (saya + pemain lain), diurutkan berdasarkan posisi vertikal:
   // yang lebih bawah digambar belakangan sehingga tampil di depan.
   const list = [{ x: player.x, y: player.y, frames: composed, left: player.facingLeft,
-                  moving: player.moving, animTime, name: playerName, chat: chatMessage }];
+                  moving: player.moving, lying: player.lying, animTime, name: playerName, chat: chatMessage }];
   for (const r of remotePlayers.values()) list.push(r);
-  if (typeof Ayam !== "undefined") Ayam.addToDrawList(list);   // ayam + pose menang (ayam.js)
+  if (typeof Npc !== "undefined") Npc.addToDrawList(list);  // NPC ikut diurutkan & digambar
+  if (typeof Kupu !== "undefined") Kupu.addToDrawList(list);   // kupu-kupu & animasi menangkap
   list.sort((a, b) => a.y - b.y);
 
   const margin = 120, visible = [];
@@ -995,6 +1227,14 @@ function draw() {
     if (c.customDraw) c.customDraw(px, py); else drawSprite(c, px, py);
     visible.push({ c, px, py });
   }
+  if (CONFIG.layerDebug) {                                                        // kotak tabrak (uji layer)
+    const bx = hitBox(player.x, player.y);
+    ctx.strokeStyle = "red"; ctx.lineWidth = 2;
+    ctx.strokeRect(bx.l - camX, bx.t - camY, bx.r - bx.l, bx.b - bx.t);
+  }
+  if (animLayerFrames.length && CONFIG.animLayerPosition === "atas") drawAnimLayer(camX, camY, viewW, viewH);   // layer animasi (di atas karakter)
+  if (overlayImg) drawOverlay(camX, camY, viewW, viewH);                          // layer atas: di atas karakter, tanpa tabrakan
+  if (animLayerFrames.length && CONFIG.animLayerPosition === "teratas") drawAnimLayer(camX, camY, viewW, viewH);   // layer animasi (di atas layer-atas.png)
   for (const v of visible) drawNameTag(v.px, v.py, v.c.name);                     // nama di atas semua karakter
   for (const v of visible) drawChatBubble(v.px, v.py, viewW, v.c.name, v.c.chat); // lalu gelembung chat
 }
@@ -1004,6 +1244,8 @@ function loop(now) {
   const dt = Math.min((now - last) / 1000, 0.05);
   last = now;
   update(dt);
+  if (typeof Npc !== "undefined") Npc.update(dt);          // NPC (npc.js)
+  if (typeof Kupu !== "undefined") Kupu.update(dt);        // kupu-kupu (kupu.js)
   draw();
   requestAnimationFrame(loop);
 }
@@ -1018,15 +1260,54 @@ function showNoCharacters() {
 }
 
 async function loadBackgrounds() {
-  const imgs = (await Promise.all(CONFIG.backgroundImages.map(src => loadImage(src, true)))).filter(Boolean);
-  if (imgs.length) return imgs;
-  const single = await loadImage(CONFIG.backgroundImage, true);   // cadangan: satu gambar latar
-  return single ? [single] : [];
+  const img = await loadImage(CONFIG.backgroundImage, true);
+  return img ? [img] : [];
 }
 
-Promise.all([loadAllBodies(), loadBackgrounds()]).then(([, bgs]) => {
+Promise.all([loadAllBodies(), loadBackgrounds(), loadImage(CONFIG.layerImage, true), loadImage(CONFIG.overlayImage, true), loadAnimLayer()]).then(([, bgs, layer, overlay, animFrames]) => {
   bgFrames = bgs;
-  if (!bgFrames.length) console.warn("Gambar latar tidak ditemukan (assets/background1.png ... 3.png atau assets/background.png)");
+  animLayerFrames = animFrames || [];
+  if (animLayerFrames.length) {
+    console.info(`Layer animasi dimuat: ${animLayerFrames.length} frame, ${animLayerFrames[0].width}x${animLayerFrames[0].height}`);
+    const a = animLayerFrames[0];
+    if (layer && CONFIG.layerMode === "map" && CONFIG.animLayerMode === "map" && (a.width !== layer.width || a.height !== layer.height))
+      console.warn(`Ukuran layer animasi (${a.width}x${a.height}) beda dengan layer (${layer.width}x${layer.height}). Samakan semuanya supaya posisinya pas.`);
+    if (animLayerFrames.some(f => f.width !== a.width || f.height !== a.height))
+      console.warn("Frame layer animasi tidak sama ukurannya. Samakan semua frame.");
+  }
+  overlayImg = overlay || null;
+  if (overlay) {
+    console.info(`Layer atas dimuat: ${overlay.width}x${overlay.height} (di atas karakter, tanpa tabrakan)`);
+    if (layer && CONFIG.layerMode === "map" && CONFIG.overlayMode === "map" && (overlay.width !== layer.width || overlay.height !== layer.height))
+      console.warn(`Ukuran layer atas (${overlay.width}x${overlay.height}) beda dengan layer (${layer.width}x${layer.height}). Samakan keduanya supaya posisinya pas.`);
+  } else console.info("Layer atas tidak ada (" + CONFIG.overlayImage + "), dilewati.");
+  // ukuran peta otomatis: dari layer (mode "map"), kalau tidak ada dari latar (mode "map")
+  let mapSize = null;
+  const bg0 = bgFrames[0];
+  bgMode = CONFIG.backgroundMode;
+  if (bgMode === "auto") {                                // latar sebesar peta/layer -> satu file penuh, selain itu diulang
+    const refW = layer && CONFIG.layerMode === "map" ? layer.width : CONFIG.worldWidth;
+    const refH = layer && CONFIG.layerMode === "map" ? layer.height : CONFIG.worldHeight;
+    bgMode = bg0 && bg0.width >= refW && bg0.height >= refH ? "map" : "tile";
+  }
+  if (bg0) console.info(`Latar: ${bg0.width}x${bg0.height}, mode "${bgMode}"`);
+  if (bg0 && bgMode === "map") mapSize = { w: bg0.width, h: bg0.height };
+  if (layer && CONFIG.layerMode === "map") {
+    if (mapSize && (mapSize.w !== layer.width || mapSize.h !== layer.height))
+      console.warn(`Ukuran latar (${mapSize.w}x${mapSize.h}) beda dengan layer (${layer.width}x${layer.height}). Samakan keduanya; ukuran layer yang dipakai.`);
+    mapSize = { w: layer.width, h: layer.height };
+  }
+  if (mapSize) {                                          // peta = ukuran gambar; muncul di sekitar tengah
+    CONFIG.worldWidth = mapSize.w; CONFIG.worldHeight = mapSize.h;
+    player.x = CONFIG.worldWidth / 2 + (Math.random() * 400 - 200);
+    player.y = CONFIG.worldHeight / 2 + (Math.random() * 400 - 200);
+  }
+  if (layer) {
+    buildLayerMask(layer);
+    placeOnFreeSpot();
+  }
+  else console.warn("File layer tidak ditemukan: " + CONFIG.layerImage + " (nama harus persis, huruf besar/kecil berpengaruh)");
+  if (!bgFrames.length) console.warn("Gambar latar tidak ditemukan (assets/background.png)");
   const opts = PARTS.body.options;
   if (!opts.length) { showNoCharacters(); return; }
   DEFAULT_OUTFIT.body.id = opts[0].id;
