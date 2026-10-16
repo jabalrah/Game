@@ -106,9 +106,14 @@
     g.stroke();
   }
 
-  function frame() {
+  // Peta mini cukup 15 kali per detik (bukan tiap frame): hemat CPU, terutama di HP.
+  const MAP_FPS = 15;
+  let lastDraw = 0, lastTop = 0, topPx = 56;
+  function frame(now) {
     requestAnimationFrame(frame);
     if (!shown) return;
+    if (now - lastDraw < 1000 / MAP_FPS - 2) return;
+    lastDraw = now;
     let ww, wh;
     try { ww = CONFIG.worldWidth; wh = CONFIG.worldHeight; } catch (e) { return; }   // game.js belum siap
     if (!(ww > 0 && wh > 0)) return;
@@ -117,8 +122,12 @@
     if (ww !== lastWW || wh !== lastWH || max !== lastMax) resize(ww, wh, max);
 
     // letakkan di kanan atas, tepat di bawah tombol Peta/Setting
-    const bar = document.getElementById("topbar");
-    const top = bar ? Math.round(bar.getBoundingClientRect().bottom + 8) : 56;
+    if (now - lastTop > 500) {                 // baca posisi bilah atas (memicu hitung ulang layout) cukup 2x per detik
+      lastTop = now;
+      const bar = document.getElementById("topbar");
+      topPx = bar ? Math.round(bar.getBoundingClientRect().bottom + 8) : 56;
+    }
+    const top = topPx;
     canvas.style.top = top + "px";
     closeBtn.style.top = (top + 4) + "px";
     closeBtn.style.right = "calc(12px + env(safe-area-inset-right, 0px))";
@@ -143,23 +152,20 @@
       g.strokeRect(camX * sx + 0.5, camY * sy + 0.5, Math.min(vw, ww) * sx, Math.min(vh, wh) * sy);
     }
 
+    // kupu-kupu (titik kecil berwarna sesuai jenisnya)
+    if (typeof Kupu !== "undefined" && Kupu.showOnMinimap) {
+      for (const b of Kupu.minimapDots) {
+        g.beginPath();
+        g.arc(b.x * sx, b.y * sy, 2, 0, Math.PI * 2);
+        g.fillStyle = b.c;
+        g.fill();
+      }
+    }
     // pemain lain
     for (const r of remotePlayers.values()) {
       const x = r.x * sx, y = r.y * sy;
       dot(x, y, 3, COLOR_OTHER);
       label(r.name, x, y);
-    }
-    // ayam (dari ayam.js)
-    if (typeof Ayam !== "undefined" && Ayam.showOnMinimap) {
-      for (const c of Ayam.list) {
-        g.beginPath();
-        g.arc(c.x * sx, c.y * sy, 2.5, 0, Math.PI * 2);
-        g.fillStyle = "#ffb347";
-        g.fill();
-        g.lineWidth = 1;
-        g.strokeStyle = "rgba(0,0,0,.7)";
-        g.stroke();
-      }
     }
     // saya (digambar terakhir agar paling atas)
     const px = player.x * sx, py = player.y * sy;

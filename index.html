@@ -44,6 +44,7 @@
     #settingsMenu button { padding:10px 12px; border:0; border-radius:10px; background:#f1f1f1;
                            font-size:15px; text-align:left; cursor:pointer; touch-action:manipulation; }
     #settingsMenu button.off { background:#bbb; color:#555; }
+    #settingsMenu button.lieOn { background:#bfdbfe; }
     #settingsMenu button.off .tx { text-decoration:line-through; }
 
     #panel { z-index:10; position:fixed; top:calc(56px + var(--sat)); right:calc(8px + var(--sar)); width:290px;
@@ -154,6 +155,7 @@
     <div class="smTitle">⚙️ Setting</div>
     <button id="btnMusic" title="Musik latar"><span>🎵</span><span class="tx"> Musik</span></button>
     <button id="btnSfx" title="Efek suara langkah"><span>👣</span><span class="tx"> Efek</span></button>
+    <button id="btnLie" title="Berbaring / bangun (tombol B)"><span>🛌</span><span class="tx"> Baring</span></button>
     <button id="btnName" title="Ganti nama karakter"><span>✏️</span><span class="tx"> Nama</span></button>
     <button id="btnCostume" title="Ganti kostum"><span>👕</span><span class="tx"> Kostum</span></button>
   </div>
@@ -180,8 +182,15 @@
     <button class="down" data-dir="down">▼</button>
   </div>
    <script src="game.js"></script>
-   <script src="ayam.js"></script>
    <script src="minimap.js"></script>
    <script src="local.js"></script>
+   <script src="tiltshift.js"></script>
+   <script src="cahaya.js"></script>
+   <script src="perf.js"></script>
+   <script src="suara.js"></script>
+  <script src="musik.js"></script>
+   <script src="npc-komentar.js"></script>
+   <script src="npc.js"></script>
+   <script src="kupu.js"></script>
 </body>
 </html>
