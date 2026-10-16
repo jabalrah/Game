@@ -27,14 +27,17 @@
     #topbar button.off { background:#bbb; color:#555; }
     #topbar button.off .tx { text-decoration:line-through; }
 
-    #dpad { position:fixed; left:calc(14px + var(--sal)); bottom:calc(14px + var(--sab)); display:grid;
-            grid-template-columns:repeat(3,var(--dp)); grid-template-rows:repeat(3,var(--dp)); gap:6px;
-            opacity:.6; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
-    #dpad button { border:0; border-radius:12px; background:#fff; font-size:22px; touch-action:none;
-                   -webkit-user-select:none; user-select:none; }
-    #dpad button:active { background:#ffd93d; }
-    #dpad .up{grid-column:2;grid-row:1} #dpad .left{grid-column:1;grid-row:2}
-    #dpad .right{grid-column:3;grid-row:2} #dpad .down{grid-column:2;grid-row:3}
+    /* joystick virtual (menggantikan tombol arah) */
+    #joystick { position:fixed; left:calc(18px + var(--sal)); bottom:calc(18px + var(--sab));
+                width:calc(var(--dp) * 2.6); height:calc(var(--dp) * 2.6); border-radius:50%;
+                background:rgba(255,255,255,.28); border:3px solid rgba(255,255,255,.75);
+                box-shadow:0 2px 10px rgba(0,0,0,.3); opacity:.7; touch-action:none;
+                user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+    #joystick.active { opacity:.95; }
+    #joyKnob { position:absolute; left:50%; top:50%; width:44%; height:44%; margin:-22% 0 0 -22%;
+               border-radius:50%; background:#fff; box-shadow:0 2px 8px rgba(0,0,0,.4);
+               pointer-events:none; will-change:transform; }
+    #joystick.active #joyKnob { background:#ffd93d; }
 
     #settingsMenu { position:fixed; top:calc(56px + var(--sat)); right:calc(8px + var(--sar)); z-index:20;
                     display:none; flex-direction:column; gap:6px; min-width:180px; background:#fff;
@@ -109,7 +112,7 @@
       .row input[type=color] { width:44px; height:40px; }
       .swatches span { width:30px; height:30px; }
       #btnRandom, #btnReset { padding:12px; font-size:15px; }
-      #dpad { opacity:.7; }
+      #joystick { opacity:.75; }
       #btnChat { display:block; }
       body.chatOpen #btnChat { display:none; }
       #chatBox { display:none; top:calc(62px + var(--sat)); bottom:auto; left:calc(8px + var(--sal));
@@ -121,8 +124,6 @@
     /* layar pendek (HP miring): tombol arah dan teks lebih kecil */
     @media (max-height: 500px) {
       :root { --dp:46px; }
-      #dpad { gap:4px; }
-      #dpad button { font-size:18px; }
       #info div { font-size:11px; padding:2px 6px; }
     }
   </style>
@@ -175,11 +176,8 @@
 
   <button id="btnChat" type="button" aria-label="Chat" title="Chat">💬</button>
 
-  <div id="dpad">
-    <button class="up" data-dir="up">▲</button>
-    <button class="left" data-dir="left">◀</button>
-    <button class="right" data-dir="right">▶</button>
-    <button class="down" data-dir="down">▼</button>
+  <div id="joystick" aria-label="Joystick">
+    <div id="joyKnob"></div>
   </div>
    <script src="game.js"></script>
    <script src="minimap.js"></script>
@@ -192,5 +190,6 @@
    <script src="npc-komentar.js"></script>
    <script src="npc.js"></script>
    <script src="kupu.js"></script>
+   <script src="papan.js"></script>
 </body>
 </html>

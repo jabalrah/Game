@@ -98,6 +98,7 @@ PERLU DIKETAHUI TENTANG PAKET GRATIS RENDER
                    (disarankan jika server di hosting dengan CPU kecil).
   NEAR_RADIUS      Radius "dekat" (piksel) jika klien tidak mengirim ukuran layar (bawaan 1500).
   CROWD_AT         Jumlah pemain di atas ini: posisi dekat dikirim 10x/detik, bukan 20x (bawaan 24).
+  BOARD_SIZE       Jumlah baris papan skor (bawaan 10). Skor = jumlah kupu-kupu yang ditangkap selama online.
   CHICKEN_COUNT    Jumlah ayam di server (bawaan 0 = mati, karena game belum memuat ayam.js).
   WORLD_WIDTH, WORLD_HEIGHT   Ukuran peta (bawaan 4096 x 4096). Ukuran dari server
                    otomatis dipakai oleh game.

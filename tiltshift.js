@@ -19,7 +19,8 @@
     vignette: 0.18        // gelap tipis di pojok layar (0 = mati)
   };
   const KEY = "gamePertamaTiltShift";
-  const LAYERS = 4;       // jumlah lapisan blur (makin banyak makin halus, tapi lebih berat)
+  const COARSE = window.matchMedia && matchMedia("(pointer: coarse)").matches;
+  const LAYERS = COARSE ? 2 : 4;       // jumlah lapisan blur (makin banyak makin halus, tapi lebih berat)
 
   const supportsBackdrop = CSS.supports("backdrop-filter", "blur(1px)") ||
                            CSS.supports("-webkit-backdrop-filter", "blur(1px)");

@@ -13,10 +13,10 @@
   // ---- Pengaturan (silakan ubah) ----
   const PERF = {
     slowFrameMs: 24,       // median waktu per frame di atas ini = terasa berat (24 ms = di bawah ~41 fps)
-    windowMs: 2500,        // lama satu jendela pengukuran
-    slowWindows: 3,        // berapa jendela berat berturut-turut sebelum efek diturunkan
-    warmupMs: 6000,        // abaikan pengukuran saat game baru dibuka (memuat gambar)
-    cooldownMs: 4000,      // jeda setelah satu penurunan sebelum menilai lagi
+    windowMs: 1500,        // lama satu jendela pengukuran
+    slowWindows: 2,        // berapa jendela berat berturut-turut sebelum efek diturunkan
+    warmupMs: 4000,        // abaikan pengukuran saat game baru dibuka (memuat gambar)
+    cooldownMs: 2500,      // jeda setelah satu penurunan sebelum menilai lagi
     rememberDays: 14
   };
   const KEY = "gamePertamaPerf";            // { level, auto, t }

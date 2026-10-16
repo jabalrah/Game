@@ -85,7 +85,7 @@ const CONFIG = {
   // Alamat server. Saat tes di komputer sendiri: "ws://localhost:3000"
   // Setelah server di-hosting, ganti dengan alamatnya, contoh: "wss://nama-game.onrender.com"
   // Kosongkan ("") untuk bermain sendiri tanpa server.
-  serverUrl: "wss://dod-startup-fashion-rail.trycloudflare.com",
+  serverUrl: "wss://pvc-mountain-graphs-railroad.trycloudflare.com",
   sendInterval: 66,         // jeda minimal kirim posisi (milidetik), sekitar 15 kali per detik
   remoteSmoothing: 14       // makin besar, gerak pemain lain makin cepat menyusul posisi terbaru
 };
@@ -648,7 +648,7 @@ document.getElementById("btnName").onclick = () => openNameMenu();
 
 // ---------- Input gerak ----------
 const keys = {};
-const touch = { up: false, down: false, left: false, right: false };
+const touch = { active: false, ax: 0, ay: 0 };   // ax/ay: arah joystick (-1..1)
 function isTyping(e) {
   const t = e.target;
   return t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA");
@@ -671,15 +671,49 @@ window.addEventListener("keydown", e => {
 window.addEventListener("keyup", e => { keys[e.code] = false; });
 window.addEventListener("blur", () => { for (const k in keys) keys[k] = false; });
 
-document.querySelectorAll("#dpad button").forEach(btn => {
-  const dir = btn.dataset.dir;
-  const on = e => { e.preventDefault(); touch[dir] = true; };
-  const off = e => { e.preventDefault(); touch[dir] = false; };
-  btn.addEventListener("pointerdown", on);
-  btn.addEventListener("pointerup", off);
-  btn.addEventListener("pointerleave", off);
-  btn.addEventListener("pointercancel", off);
-});
+// ---------- Joystick virtual ----------
+(function setupJoystick() {
+  const base = document.getElementById("joystick");
+  const knob = document.getElementById("joyKnob");
+  if (!base || !knob) return;
+  const DEAD = 0.18;          // zona mati di tengah (0..1)
+  let pid = null;
+
+  function reset() {
+    pid = null;
+    touch.active = false; touch.ax = 0; touch.ay = 0;
+    knob.style.transform = "translate(0px, 0px)";
+    base.classList.remove("active");
+  }
+  function update(e) {
+    const r = base.getBoundingClientRect();
+    const radius = r.width / 2;
+    let vx = e.clientX - (r.left + radius);
+    let vy = e.clientY - (r.top + radius);
+    const len = Math.hypot(vx, vy);
+    const maxTravel = radius * 0.56;                 // jarak gagang bergeser maksimal
+    const k = len > maxTravel ? maxTravel / len : 1;
+    knob.style.transform = `translate(${vx * k}px, ${vy * k}px)`;
+    const mag = Math.min(1, len / maxTravel);        // 0..1
+    if (mag < DEAD) { touch.ax = 0; touch.ay = 0; return; }
+    const scaled = (mag - DEAD) / (1 - DEAD);        // mulai dari 0 setelah zona mati
+    touch.ax = (vx / len) * scaled;
+    touch.ay = (vy / len) * scaled;
+  }
+  base.addEventListener("pointerdown", e => {
+    if (pid !== null) return;
+    e.preventDefault();
+    pid = e.pointerId;
+    try { base.setPointerCapture(pid); } catch (_) {}
+    touch.active = true;
+    base.classList.add("active");
+    update(e);
+  });
+  base.addEventListener("pointermove", e => { if (e.pointerId === pid) { e.preventDefault(); update(e); } });
+  ["pointerup", "pointercancel", "lostpointercapture"].forEach(ev =>
+    base.addEventListener(ev, e => { if (e.pointerId === pid) reset(); }));
+  window.addEventListener("blur", reset);
+})();
 
 // ---------- State pemain ----------
 const player = {
@@ -788,6 +822,7 @@ function netConnect() {
     remotePlayers.clear();
     if (typeof Npc !== "undefined") Npc.netLost();
     if (typeof Kupu !== "undefined") Kupu.netLost();
+    if (typeof Papan !== "undefined") Papan.reset();
     if (!netNote) netNote = "Tidak terhubung ke server";
     updateNetStatus();
     scheduleReconnect();
@@ -858,6 +893,7 @@ function handleNetMessage(msg) {
       }
       break;
     }
+    case "board": if (typeof Papan !== "undefined") Papan.net(msg); break;
     case "npc": case "npcsay": if (typeof Npc !== "undefined") Npc.net(msg); break;
     case "kp": case "kc": case "km": case "kz": if (typeof Kupu !== "undefined") Kupu.net(msg); break;
     case "outfit": {
@@ -983,13 +1019,13 @@ function placeOnFreeSpot() {
 
 function update(dt) {
   let dx = 0, dy = 0;
-  if (keys.ArrowLeft || keys.KeyA || touch.left) dx -= 1;
-  if (keys.ArrowRight || keys.KeyD || touch.right) dx += 1;
-  if (keys.ArrowUp || keys.KeyW || touch.up) dy -= 1;
-  if (keys.ArrowDown || keys.KeyS || touch.down) dy += 1;
+  if (keys.ArrowLeft || keys.KeyA) dx -= 1;
+  if (keys.ArrowRight || keys.KeyD) dx += 1;
+  if (keys.ArrowUp || keys.KeyW) dy -= 1;
+  if (keys.ArrowDown || keys.KeyS) dy += 1;
+  if (dx !== 0 && dy !== 0) { dx *= Math.SQRT1_2; dy *= Math.SQRT1_2; }   // diagonal keyboard
+  if (dx === 0 && dy === 0 && touch.active) { dx = touch.ax; dy = touch.ay; }   // joystick (analog, sudah <= 1)
   if (typeof Kupu !== "undefined" && Kupu.frozen) { dx = 0; dy = 0; }   // sedang mengayun jaring: diam
-
-  if (dx !== 0 && dy !== 0) { dx *= Math.SQRT1_2; dy *= Math.SQRT1_2; }
   if (dx < 0) player.facingLeft = true;
   if (dx > 0) player.facingLeft = false;
 
@@ -1240,14 +1276,18 @@ function draw() {
 }
 
 let last = performance.now();
+const FRAME_MS = 1000 / 60;   // batas 60 fps: di layar 90/120 Hz, kerja gambar tidak dobel (lebih hemat & stabil)
+let nextFrameAt = 0;
 function loop(now) {
+  requestAnimationFrame(loop);
+  if (now < nextFrameAt - 1) return;                       // lewati frame ekstra
+  nextFrameAt = Math.max(nextFrameAt + FRAME_MS, now - FRAME_MS);   // jadwal tetap rata (layar 90 Hz tetap ~60 fps)
   const dt = Math.min((now - last) / 1000, 0.05);
   last = now;
   update(dt);
   if (typeof Npc !== "undefined") Npc.update(dt);          // NPC (npc.js)
   if (typeof Kupu !== "undefined") Kupu.update(dt);        // kupu-kupu (kupu.js)
   draw();
-  requestAnimationFrame(loop);
 }
 
 function showNoCharacters() {
