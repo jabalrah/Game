@@ -4,7 +4,7 @@
 //   - Kalau kamu BERJALAN mendekat, kupu-kupu bisa kaget lalu terbang menjauh.
 //     Kupu-kupu langka lebih mudah kaget dan terbang lebih cepat.
 //   - Kalau kamu BERDIRI DIAM, kupu-kupu tidak kaget. Dekati, berhenti, lalu tangkap!
-//   - Tangkap: tombol SHIFT (di HP: tombol 🦋). Karakter mengayun jaring ke depan;
+//   - Tangkap: tombol SPASI (di HP: tombol 🦋). Karakter mengayun jaring ke depan;
 //     kupu-kupu yang berada di area jaring saat ayunan mengenai sasaran akan tertangkap.
 // Gambar:
 //   assets/kupu/<jenis>/1.png, 2.png, 3.png      3 frame kepakan sayap (menghadap KANAN)
@@ -49,7 +49,7 @@ const KUPU_CONFIG = {
   catchHitFrame: 2,         // jaring mengenai sasaran saat frame ini mulai tampil (2 = saat ayunan ke depan)
   catchCooldown: 0.25,      // jeda sebelum boleh mengayun lagi (detik)
   catchFrameCount: 2,       // jumlah frame tangkap1.png ... tangkapN.png
-  keys: ["ShiftLeft", "ShiftRight"],  // tombol keyboard untuk menangkap (Shift kiri / kanan)
+  keys: ["Space"],  // tombol keyboard untuk menangkap (Spasi)
 
   showScore: true           // tampilkan jumlah tangkapan di kiri atas
 };
@@ -216,6 +216,7 @@ const Kupu = (function () {
   function tryCatch() {
     if (!ready || catching || cooldown > 0) return;
     if (typeof nameMenuOpen !== "undefined" && nameMenuOpen) return;
+    if (typeof infoMenuOpen !== "undefined" && infoMenuOpen) return;
     if (player.lying && typeof setLying === "function") setLying(false);
     catching = { t: 0, hit: false, left: player.facingLeft };
     catchFramesFor(myBodyId());
@@ -270,8 +271,22 @@ const Kupu = (function () {
       pending[i] -= dt;
       if (pending[i] <= 0) { pending.splice(i, 1); spawnOne(); }
     }
+    if (typeof remotePlayers !== "undefined") {            // animasi menangkap pemain lain
+      for (const r of remotePlayers.values()) {
+        if (!r.catching) continue;
+        r.catching.t += dt;
+        if (r.catching.t >= catchTotal()) { r.catching = null; r.customDraw = null; }
+      }
+    }
     const now = performance.now();
     for (let i = popups.length - 1; i >= 0; i--) if (now - popups[i].born > 1800) popups.splice(i, 1);
+  }
+  // mulai animasi menangkap pemain lain; mulai dari frame saat jaring mengenai sasaran (server baru memberi tahu di saat itu)
+  function startRemoteCatch(r, left) {
+    if (!r) return;
+    const id = r.outfit && r.outfit.body && r.outfit.body.id;
+    catchFramesFor(id);
+    r.catching = { t: catchHitTime(), left: left === undefined ? !!r.left : !!left };
   }
 
   // ---- Menggambar ----
@@ -306,18 +321,20 @@ const Kupu = (function () {
     ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.strokeStyle = "#3c3c46"; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(cx, cy, NET.r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
   }
-  function drawCatcher(px, py) {
+  function drawCatcher(px, py) { drawCatchAnim(catching, myBodyId(), composed, px, py); }
+  // gambar animasi menangkap: dipakai untuk pemain sendiri dan pemain lain (ct = { t, left })
+  function drawCatchAnim(ct, bodyId, frames, px, py) {
     const w = CONFIG.playerWidth, h = CONFIG.playerHeight;
-    const i = catchFrameAt(catching.t);
-    const set = catchSets[myBodyId()];
-    const flip = CONFIG.spriteFacesRight ? catching.left : !catching.left;
+    const i = catchFrameAt(ct.t);
+    const set = catchSets[bodyId];
+    const flip = CONFIG.spriteFacesRight ? ct.left : !ct.left;
     if (set) {                                           // animasi buatan sendiri: tangkap1-2.png
       ctx.save(); ctx.translate(px, py);
       if (flip) ctx.scale(-1, 1);
       ctx.drawImage(set[i], -w / 2, -h / 2, w, h);
       ctx.restore();
     } else {                                             // otomatis: karakter diam + jaring
-      drawSprite({ frames: composed, left: catching.left, moving: false, lying: false, animTime: 0 }, px, py);
+      drawSprite({ frames, left: ct.left, moving: false, lying: false, animTime: 0 }, px, py);
       ctx.save(); ctx.translate(px, py);
       if (flip) ctx.scale(-1, 1);
       ctx.scale(w / 128, h / 128); ctx.translate(-64, -64);
@@ -351,6 +368,13 @@ const Kupu = (function () {
 
   function addToDrawList(drawList) {
     if (catching && drawList.length) drawList[0].customDraw = (px, py) => drawCatcher(px, py);
+    if (typeof remotePlayers !== "undefined") {            // pemain lain yang sedang mengayun jaring
+      for (const r of remotePlayers.values()) {
+        const ct = r.catching;
+        if (ct && r.frames) r.customDraw = (px, py) => drawCatchAnim(ct, r.outfit && r.outfit.body && r.outfit.body.id, r.frames, px, py);
+        else if (r.customDraw) r.customDraw = null;
+      }
+    }
     for (const b of list) drawList.push(b);
     for (const p of popups) drawList.push({ x: p.px, y: p.py + 90, customDraw: (px, py) => drawPopup(p, px, py - 90) });
   }
@@ -409,14 +433,23 @@ const Kupu = (function () {
     if (mode !== "server") return;
     if (msg.t === "kp") netList(msg.k);
     else if (msg.t === "kz") { if (Array.isArray(msg.z)) setFarDots(msg.z, 1, 2, 0); }
-    else if (msg.t === "km") {                // jaring saya meleset
+    else if (msg.t === "ks") {                // pemain lain mengayun jaring
+      startRemoteCatch(typeof remotePlayers !== "undefined" ? remotePlayers.get(msg.id) : null, !!msg.l);
+    } else if (msg.t === "km") {                // jaring saya meleset
       popups.push({ born: performance.now(), px: player.x, py: player.y, text: "Meleset…", color: "#d0d0d0", spark: false });
     } else if (msg.t === "kc") {              // seseorang menangkap kupu-kupu
       const b = byId.get(msg.id);
       if (b) { byId.delete(msg.id); const i = list.indexOf(b); if (i >= 0) list.splice(i, 1); }
-      if (msg.by !== myId) return;            // pemain lain yang dapat: cukup hilangkan
       const k = kinds[msg.k] && kinds[msg.k].cfg;
       if (!k) return;
+      if (msg.by !== myId) {                  // pemain lain yang dapat: tampilkan animasi (jika belum) dan notifikasi poinnya
+        const r = typeof remotePlayers !== "undefined" ? remotePlayers.get(msg.by) : null;
+        if (!r) return;
+        if (!r.catching) startRemoteCatch(r);   // cadangan untuk server lama yang belum mengirim "ks"
+        popups.push({ born: performance.now(), px: r.x, py: r.y, sx: msg.x, sy: msg.y - k.alt,
+                      text: "🦋 " + r.name + " +1 " + k.nama + (k.langka ? " (langka!)" : ""), color: k.langka ? "#ffd23c" : "#bfe6ff", spark: true });
+        return;
+      }
       counts[k.id] = (counts[k.id] || 0) + 1;
       save(); showScore();
       if (typeof Suara !== "undefined") Suara.catchSuccess(!!k.langka);
@@ -430,11 +463,14 @@ const Kupu = (function () {
     if (!C.keys.includes(e.code) || e.repeat) return;
     if (typeof isTyping === "function" && isTyping(e)) return;
     if (typeof nameMenuOpen !== "undefined" && nameMenuOpen) return;
+    if (typeof infoMenuOpen !== "undefined" && infoMenuOpen) return;
     e.preventDefault();
+    // Spasi juga menekan tombol yang sedang fokus (mis. Setting): lepaskan fokusnya dulu
+    if (document.activeElement && document.activeElement.tagName === "BUTTON") document.activeElement.blur();
     tryCatch();
   });
   const btn = document.createElement("button");
-  btn.id = "btnCatch"; btn.type = "button"; btn.title = "Tangkap kupu-kupu (Shift)"; btn.textContent = "🦋";
+  btn.id = "btnCatch"; btn.type = "button"; btn.title = "Tangkap kupu-kupu (Spasi)"; btn.textContent = "🦋";
   const coarse = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
   Object.assign(btn.style, {
     position: "fixed", right: "calc(14px + env(safe-area-inset-right, 0px))",

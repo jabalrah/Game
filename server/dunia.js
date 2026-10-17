@@ -286,6 +286,8 @@ function createDunia(opt) {
     me.lastNet = now;
     const x = typeof msg.x === "number" && Number.isFinite(msg.x) ? msg.x : null;
     const y = typeof msg.y === "number" && Number.isFinite(msg.y) ? msg.y : null;
+    // beritahu pemain lain bahwa pemain ini mengayun jaring (supaya animasi tangkap terlihat, kena atau meleset)
+    broadcast({ t: "ks", id: me.id, l: (x !== null ? x < me.x : !!me.left) ? 1 : 0 }, me.id);
     if (x === null || y === null || Math.hypot(x - me.x, y - me.y) > KUPU.netReach + 90) { sendTo(ws, { t: "km" }); return; }
     let best = -1, bd = KUPU.netRadius + KUPU.netTolerance;
     for (let i = 0; i < kupus.length; i++) {

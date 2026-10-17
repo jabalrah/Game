@@ -14,7 +14,8 @@
 const MUSIK_CONFIG = {
   lagu: [
     { nama: "Santai Pagi", file: "assets/musik/lagu.mp3" },
-    { nama: "Petualangan",  file: "assets/musik/bgm.mp3" },
+    { nama: "Projector",  file: "assets/musik/bgm.mp3" },
+    { nama: "pure imagination",  file: "assets/musik/msk.mp3" },
   ],
   acak: false,            // true = lagu berikutnya dipilih acak, false = urut sesuai daftar
   musikVolume: 0.2,      // volume awal lagu (0 - 1), pemain bisa mengubahnya di panel
