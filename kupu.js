@@ -4,7 +4,7 @@
 //   - Kalau kamu BERJALAN mendekat, kupu-kupu bisa kaget lalu terbang menjauh.
 //     Kupu-kupu langka lebih mudah kaget dan terbang lebih cepat.
 //   - Kalau kamu BERDIRI DIAM, kupu-kupu tidak kaget. Dekati, berhenti, lalu tangkap!
-//   - Tangkap: tombol SHIFT (di HP: tombol 🦋). Karakter mengayun jaring ke depan;
+//   - Tangkap: tombol SPASI (di HP: tombol 🦋). Karakter mengayun jaring ke depan;
 //     kupu-kupu yang berada di area jaring saat ayunan mengenai sasaran akan tertangkap.
 // Gambar:
 //   assets/kupu/<jenis>/1.png, 2.png, 3.png      3 frame kepakan sayap (menghadap KANAN)
@@ -49,7 +49,7 @@ const KUPU_CONFIG = {
   catchHitFrame: 2,         // jaring mengenai sasaran saat frame ini mulai tampil (2 = saat ayunan ke depan)
   catchCooldown: 0.25,      // jeda sebelum boleh mengayun lagi (detik)
   catchFrameCount: 2,       // jumlah frame tangkap1.png ... tangkapN.png
-  keys: ["ShiftLeft", "ShiftRight"],  // tombol keyboard untuk menangkap (Shift kiri / kanan)
+  keys: ["Space"],  // tombol keyboard untuk menangkap (Spasi)
 
   showScore: true           // tampilkan jumlah tangkapan di kiri atas
 };
@@ -216,6 +216,7 @@ const Kupu = (function () {
   function tryCatch() {
     if (!ready || catching || cooldown > 0) return;
     if (typeof nameMenuOpen !== "undefined" && nameMenuOpen) return;
+    if (typeof infoMenuOpen !== "undefined" && infoMenuOpen) return;
     if (player.lying && typeof setLying === "function") setLying(false);
     catching = { t: 0, hit: false, left: player.facingLeft };
     catchFramesFor(myBodyId());
@@ -462,11 +463,14 @@ const Kupu = (function () {
     if (!C.keys.includes(e.code) || e.repeat) return;
     if (typeof isTyping === "function" && isTyping(e)) return;
     if (typeof nameMenuOpen !== "undefined" && nameMenuOpen) return;
+    if (typeof infoMenuOpen !== "undefined" && infoMenuOpen) return;
     e.preventDefault();
+    // Spasi juga menekan tombol yang sedang fokus (mis. Setting): lepaskan fokusnya dulu
+    if (document.activeElement && document.activeElement.tagName === "BUTTON") document.activeElement.blur();
     tryCatch();
   });
   const btn = document.createElement("button");
-  btn.id = "btnCatch"; btn.type = "button"; btn.title = "Tangkap kupu-kupu (Shift)"; btn.textContent = "🦋";
+  btn.id = "btnCatch"; btn.type = "button"; btn.title = "Tangkap kupu-kupu (Spasi)"; btn.textContent = "🦋";
   const coarse = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
   Object.assign(btn.style, {
     position: "fixed", right: "calc(14px + env(safe-area-inset-right, 0px))",
