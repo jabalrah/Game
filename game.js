@@ -29,6 +29,15 @@ const CONFIG = {
   overlayImage: "assets/layer-atas.png",
   overlayMode: "map",
 
+  // Layer BAYANGAN (PNG): digambar DI ATAS karakter tapi DI BAWAH layer-atas.png, tanpa tabrakan.
+  // Cocok untuk bayangan pohon/bangunan yang jatuh ke karakter. Kalau file tidak ada, dilewati.
+  // Ukurannya harus sama dengan layer.png (mode "map"). shadowMode: "map" | "tile" | "stretch".
+  shadowImage: "assets/bayangan.png",
+  shadowMode: "map",
+  tileSize: 128,            // layer besar dipotong jadi kotak segini (piksel); kotak transparan dibuang. Makin kecil = makin hemat memori, tapi makin banyak kotak (64 / 128 / 256)
+  shadowStretchPx: 3,       // animasi: bayangan meregang ke KIRI sejauh ini (piksel), lalu kembali. 0 = tanpa animasi
+  shadowStretchSpeed: 0.5,  // kecepatan: berapa kali meregang-kembali per detik (0.5 = tiap 2 detik; bergantian asli <-> meregang)
+
   // Layer ANIMASI (PNG, beberapa frame): lapisan dekorasi yang bergerak, tanpa tabrakan (bisa dilewati).
   // Cocok untuk air, riak, rumput bergoyang, api, kabut. Nama file: layer-animasi1.png, layer-animasi2.png, dst.
   // Semua frame harus ada dan ukurannya sama dengan layer.png (mode "map").
@@ -85,7 +94,7 @@ const CONFIG = {
   // Alamat server. Saat tes di komputer sendiri: "ws://localhost:3000"
   // Setelah server di-hosting, ganti dengan alamatnya, contoh: "wss://nama-game.onrender.com"
   // Kosongkan ("") untuk bermain sendiri tanpa server.
-  serverUrl: "wss://ted-catalogs-lil-regulatory.trycloudflare.com",
+  serverUrl: "wss://superb-peer-instruments-messenger.trycloudflare.com",
   sendInterval: 66,         // jeda minimal kirim posisi (milidetik), sekitar 15 kali per detik
   remoteSmoothing: 14       // makin besar, gerak pemain lain makin cepat menyusul posisi terbaru
 };
@@ -638,6 +647,7 @@ nameForm.addEventListener("submit", e => {
   closeNameMenu();
   if (netReady) { if (changed) netSend({ t: "name", name: playerName }); }
   else { netBlocked = false; netConnect(); }
+  maybeShowInfo();                     // pertama kali main: tampilkan panduan tombol
 });
 nameCancel.addEventListener("click", closeNameMenu);
 nameInput.addEventListener("input", () => { nameError.textContent = ""; });
@@ -654,6 +664,10 @@ function isTyping(e) {
   return t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA");
 }
 window.addEventListener("keydown", e => {
+  if (infoMenuOpen) {                      // panel info terbuka: karakter tidak bergerak; Enter/Esc menutup
+    if ((e.code === "Enter" || e.code === "Escape") && !e.repeat) { e.preventDefault(); closeInfoMenu(); }
+    return;
+  }
   if (nameMenuOpen) {                      // menu nama terbuka: karakter tidak bergerak
     if (!isTyping(e) && e.code === "Enter") { e.preventDefault(); nameInput.focus(); }
     return;
@@ -670,6 +684,30 @@ window.addEventListener("keydown", e => {
 });
 window.addEventListener("keyup", e => { keys[e.code] = false; });
 window.addEventListener("blur", () => { for (const k in keys) keys[k] = false; });
+
+// ---------- Panel info kontrol (muncul sekali saat pertama main; bisa dibuka lagi lewat Setting > Info) ----------
+const INFO_KEY = "gamePertamaInfoSeen";
+const infoMenu = document.getElementById("infoMenu");
+let infoMenuOpen = false;
+function openInfoMenu() {
+  infoMenuOpen = true;
+  for (const k in keys) keys[k] = false;
+  infoMenu.classList.add("open");
+}
+function closeInfoMenu() {
+  infoMenuOpen = false;
+  infoMenu.classList.remove("open");
+  for (const k in keys) keys[k] = false;
+  try { localStorage.setItem(INFO_KEY, "1"); } catch (e) {}
+}
+function maybeShowInfo() {              // tampilkan panel hanya jika belum pernah dilihat
+  let seen = false;
+  try { seen = localStorage.getItem(INFO_KEY) === "1"; } catch (e) {}
+  if (!seen) openInfoMenu();
+}
+document.getElementById("infoClose").addEventListener("click", closeInfoMenu);
+infoMenu.addEventListener("pointerdown", e => { if (e.target === infoMenu) closeInfoMenu(); });   // klik di luar kotak = tutup
+document.getElementById("btnInfo").onclick = () => openInfoMenu();
 
 // ---------- Joystick virtual ----------
 (function setupJoystick() {
@@ -895,7 +933,7 @@ function handleNetMessage(msg) {
     }
     case "board": if (typeof Papan !== "undefined") Papan.net(msg); break;
     case "npc": case "npcsay": if (typeof Npc !== "undefined") Npc.net(msg); break;
-    case "kp": case "kc": case "km": case "kz": if (typeof Kupu !== "undefined") Kupu.net(msg); break;
+    case "kp": case "kc": case "km": case "kz": case "ks": if (typeof Kupu !== "undefined") Kupu.net(msg); break;
     case "outfit": {
       const r = remotePlayers.get(msg.id), o = validOutfit(msg.outfit);
       if (r && o) { prepareOutfit(o); r.outfit = o; r.frames = composeCached(o); }
@@ -921,7 +959,7 @@ function handleNetMessage(msg) {
 // ---------- Update ----------
 // ---------- Layer rintangan (collision dari PNG) ----------
 let layerImg = null;        // gambar layer
-let layerMask = null;       // Uint8Array: 1 = terisi (tabrakan), 0 = bolong
+let layerMask = null;       // Uint8Array berisi bit: 1 = terisi (tabrakan), 0 = bolong (1 bit per piksel, hemat 8x)
 let layerW = 0, layerH = 0;
 
 function buildLayerMask(img) {
@@ -931,7 +969,7 @@ function buildLayerMask(img) {
     const c = document.createElement("canvas");
     c.width = layerW; c.height = Math.min(band, layerH);
     const g = c.getContext("2d", { willReadFrequently: true });
-    const mask = new Uint8Array(layerW * layerH);
+    const mask = new Uint8Array(Math.ceil(layerW * layerH / 8));
     let solid = 0;
     for (let y0 = 0; y0 < layerH; y0 += band) {
       const hh = Math.min(band, layerH - y0);
@@ -940,11 +978,11 @@ function buildLayerMask(img) {
       const d = g.getImageData(0, 0, layerW, hh).data;
       for (let i = 0, n = layerW * hh; i < n; i++) {
         const v = d[i * 4 + 3] > CONFIG.layerAlphaMin ? 1 : 0;
-        mask[y0 * layerW + i] = v; solid += v;
+        if (v) { const k = y0 * layerW + i; mask[k >> 3] |= 1 << (k & 7); solid++; }
       }
     }
     layerMask = mask;
-    console.info(`Layer dimuat: ${layerW}x${layerH}, ${(solid / mask.length * 100).toFixed(1)}% terisi (tabrakan aktif)`);
+    console.info(`Layer dimuat: ${layerW}x${layerH}, ${(solid / (layerW * layerH) * 100).toFixed(1)}% terisi (tabrakan aktif)`);
     if (solid === 0) console.warn("Layer tidak punya bagian terisi (semuanya transparan), jadi tidak ada tabrakan.");
   } catch (e) {
     layerMask = null;       // biasanya karena game dibuka langsung dari file (bukan lewat server)
@@ -966,7 +1004,8 @@ function layerSolidAt(x, y) {       // titik dunia (x, y) menabrak bagian terisi
     u = ((Math.floor(x) % layerW) + layerW) % layerW;
     v = ((Math.floor(y) % layerH) + layerH) % layerH;
   }
-  return layerMask[v * layerW + u] === 1;
+  const k = v * layerW + u;
+  return (layerMask[k >> 3] >> (k & 7)) & 1;
 }
 
 // kotak tabrak ada di kaki karakter; (px, py) = titik tengah karakter
@@ -1075,16 +1114,30 @@ function update(dt) {
 function currentBg() {
   return bgFrames[0] || null;
 }
-function drawOnce(img, camX, camY, viewW, viewH) {   // satu file menutupi peta; gambar hanya bagian yang terlihat
+// Menggambar gambar yang sudah dipotong jadi kotak (lihat tileFrame): hanya kotak yang terlihat.
+// Tepi tiap kotak dibulatkan ke piksel perangkat, dan kotak bertetangga berbagi tepi yang sama, jadi tidak ada garis celah.
+function drawTileSet(img, camX, camY, viewW, viewH, c) {
+  const g = c || ctx, k = g.getTransform().a || 1;
+  const sn = v => Math.round(v * k) / k;
+  for (const t of img.tiles) {
+    const w = t.c.width, h = t.c.height, x1 = t.x - camX, y1 = t.y - camY;
+    if (x1 + w < 0 || x1 > viewW || y1 + h < 0 || y1 > viewH) continue;
+    const dx = sn(x1), dy = sn(y1);
+    g.drawImage(t.c, dx, dy, sn(x1 + w) - dx, sn(y1 + h) - dy);
+  }
+}
+function drawOnce(img, camX, camY, viewW, viewH, c) {   // satu file menutupi peta; gambar hanya bagian yang terlihat
+  if (img.tiles) { drawTileSet(img, camX, camY, viewW, viewH, c); return; }
   const sx = Math.max(0, Math.floor(camX)), sy = Math.max(0, Math.floor(camY));
   const sw = Math.min(img.width - sx, Math.ceil(viewW) + 2), sh = Math.min(img.height - sy, Math.ceil(viewH) + 2);
-  if (sw > 0 && sh > 0) ctx.drawImage(img, sx, sy, sw, sh, sx - camX, sy - camY, sw, sh);
+  if (sw > 0 && sh > 0) (c || ctx).drawImage(img, sx, sy, sw, sh, sx - camX, sy - camY, sw, sh);
 }
 function drawLayer(camX, camY, viewW, viewH) {
   if (CONFIG.layerMode === "map") drawOnce(layerImg, camX, camY, viewW, viewH);
   else drawTiled(layerImg, camX, camY, viewW, viewH, CONFIG.layerMode);
 }
 let overlayImg = null;       // layer atas (di atas karakter, tanpa tabrakan)
+let shadowImg = null;        // layer bayangan (di atas karakter, di bawah layer atas, tanpa tabrakan)
 let animLayerFrames = [];    // layer animasi (dekorasi bergerak, tanpa tabrakan)
 // Tombol "Animasi" di menu Setting: hidupkan / matikan layer animasi (pilihan diingat)
 const ANIM_KEY = "gamePertamaAnimLayer";
@@ -1127,10 +1180,10 @@ function drawAnimLayer(camX, camY, viewW, viewH) {
   else drawTiled(img, camX, camY, viewW, viewH, CONFIG.animLayerMode);
   ctx.restore();
 }
-// Memotong gambar besar jadi kotak 256x256 dan hanya menyimpan kotak yang ada isinya.
+// Memotong gambar besar jadi kotak kecil (CONFIG.tileSize) dan hanya menyimpan kotak yang ada isinya.
 // Hasilnya jauh lebih ringan di memori/GPU, dan pergantian frame tidak membuat game tersendat.
 async function tileFrame(img) {
-  const T = 256, W = img.width, H = img.height;
+  const T = CONFIG.tileSize || 128, W = img.width, H = img.height;
   const band = document.createElement("canvas");
   band.width = W; band.height = T;
   const g = band.getContext("2d", { willReadFrequently: true });
@@ -1158,24 +1211,48 @@ async function tileFrame(img) {
   return { width: W, height: H, tiles };
 }
 async function loadAnimLayer() {
-  const jobs = [];
-  for (let n = 1; n <= CONFIG.animLayerFrameCount; n++) jobs.push(loadImage(`${CONFIG.animLayerPrefix}${n}.png`, true));
-  const all = await Promise.all(jobs);
-  if (all.every(Boolean)) {
-    if (CONFIG.animLayerMode !== "map") return all;
-    try {
-      const out = [];
-      for (const img of all) out.push(await tileFrame(img));
-      console.info("Layer animasi dipotong: " + out.map(f => f.tiles.length + " kotak").join(", "));
-      return out;
-    } catch (e) {
-      console.warn("Gagal memotong layer animasi, pakai gambar utuh:", e.message || e);
-      return all;
-    }
+  // dimuat satu per satu lalu langsung dipotong jadi kotak, supaya gambar penuh (64 MB) tidak menumpuk di memori
+  const frames = [];
+  let missing = 0;
+  for (let n = 1; n <= CONFIG.animLayerFrameCount; n++) {
+    const img = await loadImage(`${CONFIG.animLayerPrefix}${n}.png`, true);
+    if (!img) { missing++; continue; }
+    if (CONFIG.animLayerMode !== "map") { frames.push(img); continue; }
+    frames.push(await tileSafe(img));
   }
-  if (all.some(Boolean))
+  if (!missing) {
+    if (frames.every(f => f.tiles)) console.info("Layer animasi dipotong: " + frames.map(f => f.tiles.length + " kotak").join(", "));
+    return frames;
+  }
+  if (frames.length)
     console.warn(`Layer animasi tidak dipakai: harus lengkap ${CONFIG.animLayerPrefix}1.png sampai ${CONFIG.animLayerPrefix}${CONFIG.animLayerFrameCount}.png.`);
   return [];
+}
+async function tileSafe(img) {            // potong jadi kotak; kalau gagal pakai gambar utuh
+  try { return await tileFrame(img); }
+  catch (e) { console.warn("Gagal memotong layer, pakai gambar utuh:", e.message || e); return img; }
+}
+// Antrean: gambar besar dimuat SATU PER SATU (muat -> potong -> lepas), jadi memori tidak melonjak.
+let loadChain = Promise.resolve();
+function inOrder(fn) { const p = loadChain.then(fn); loadChain = p.catch(() => {}); return p; }
+// Layer tanpa tabrakan (layer atas, bayangan): hasilnya { width, height, tiled }
+function loadLayerTiled(src, mode) {
+  return inOrder(async () => {
+    const img = await loadImage(src, true);
+    if (!img) return null;
+    return { width: img.width, height: img.height, tiled: mode === "map" ? await tileSafe(img) : img };
+  });
+}
+// Layer rintangan: peta tabrakan dibuat dari gambar penuh, lalu gambarnya dipotong jadi kotak
+function loadLayerWithMask(src) {
+  return inOrder(async () => {
+    const img = await loadImage(src, true);
+    if (!img) return null;
+    const out = { width: img.width, height: img.height };
+    buildLayerMask(img);
+    if (CONFIG.layerMode === "map") layerImg = await tileSafe(img);
+    return out;
+  });
 }
 function drawOverlay(camX, camY, viewW, viewH) {
   ctx.save();
@@ -1184,6 +1261,74 @@ function drawOverlay(camX, camY, viewW, viewH) {
   ctx.clip();
   if (CONFIG.overlayMode === "map") drawOnce(overlayImg, camX, camY, viewW, viewH);
   else drawTiled(overlayImg, camX, camY, viewW, viewH, CONFIG.overlayMode);
+  ctx.restore();
+}
+let shadowDil = null;                        // salinan bayangan yang SUDAH meregang penuh ke kiri (dibuat sekali, lihat buildShadowDilated)
+// Buat salinan bayangan yang meregang penuh ke kiri sejauh shadowStretchPx: tiap piksel mengambil
+// piksel terpekat dari N piksel di kanannya. Membaca dari kotak bayangan dan hasilnya juga berupa kotak
+// (hanya yang berisi), dikerjakan bertahap di latar belakang supaya game tidak tersendat.
+function buildShadowDilated(src) {
+  const N = Math.ceil(CONFIG.shadowStretchPx || 0);
+  if (N <= 0 || !src || !src.tiles) return;
+  try {
+    const W = src.width, H = src.height, T = CONFIG.tileSize || 128;
+    const rows = new Map();
+    for (const t of src.tiles) { if (!rows.has(t.y)) rows.set(t.y, []); rows.get(t.y).push(t); }
+    const ys = [...rows.keys()].sort((p, q) => p - q);
+    const tmp = document.createElement("canvas"); tmp.width = W; tmp.height = T;
+    const tctx = tmp.getContext("2d", { willReadFrequently: true });
+    const tiles = [];
+    let idx = 0;
+    const work = () => {
+      try {
+        if (idx >= ys.length) { shadowDil = { width: W, height: H, tiles }; return; }
+        const y0 = ys[idx++], bh = Math.min(T, H - y0);
+        tctx.clearRect(0, 0, W, T);
+        for (const t of rows.get(y0)) tctx.drawImage(t.c, t.x, 0);
+        const d = tctx.getImageData(0, 0, W, bh).data, o = new Uint8ClampedArray(d.length);
+        for (let row = 0; row < bh; row++) {
+          const rb = row * W * 4;
+          for (let x = 0; x < W; x++) {
+            const i = rb + x * 4;
+            let bi = i, ba = d[i + 3];
+            const kMax = Math.min(N, W - 1 - x);
+            for (let k = 1; k <= kMax; k++) { const j = i + k * 4; if (d[j + 3] > ba) { ba = d[j + 3]; bi = j; } }
+            if (ba) { o[i] = d[bi]; o[i + 1] = d[bi + 1]; o[i + 2] = d[bi + 2]; o[i + 3] = ba; }
+          }
+        }
+        const data = new ImageData(o, W, bh);
+        for (let x0 = 0; x0 < W; x0 += T) {
+          const ww = Math.min(T, W - x0);
+          let any = false;
+          for (let yy = 0; yy < bh && !any; yy++) {
+            let i = (yy * W + x0) * 4 + 3;
+            for (let xx = 0; xx < ww; xx++, i += 4) if (o[i]) { any = true; break; }
+          }
+          if (!any) continue;
+          const c = document.createElement("canvas"); c.width = ww; c.height = bh;
+          c.getContext("2d").putImageData(data, -x0, 0, x0, 0, ww, bh);
+          tiles.push({ x: x0, y: y0, c });
+        }
+        setTimeout(work, 0);
+      } catch (e) { console.warn("Animasi regang bayangan dibatalkan:", e.message || e); }
+    };
+    setTimeout(work, 0);
+  } catch (e) { console.warn("Animasi regang bayangan dibatalkan:", e.message || e); }
+}
+function drawShadow(camX, camY, viewW, viewH) {
+  // Animasi regang hanya memilih satu dari dua gambar (asli / meregang penuh), jadi biayanya sama dengan
+  // menggambar bayangan biasa. Ikut mati bersama tombol "Animasi" dan penghemat otomatis (perf.js).
+  let img = shadowImg;
+  if (shadowDil && animLayerOn && CONFIG.shadowMode === "map") {
+    const t = performance.now() / 1000;
+    if (Math.sin(2 * Math.PI * (CONFIG.shadowStretchSpeed || 0.5) * t) > 0) img = shadowDil;
+  }
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(-camX, -camY, CONFIG.worldWidth, CONFIG.worldHeight);
+  ctx.clip();
+  if (CONFIG.shadowMode === "map") drawOnce(img, camX, camY, viewW, viewH);
+  else drawTiled(img, camX, camY, viewW, viewH, CONFIG.shadowMode);
   ctx.restore();
 }
 function drawTiled(img, camX, camY, viewW, viewH, mode) {
@@ -1269,6 +1414,7 @@ function draw() {
     ctx.strokeRect(bx.l - camX, bx.t - camY, bx.r - bx.l, bx.b - bx.t);
   }
   if (animLayerFrames.length && CONFIG.animLayerPosition === "atas") drawAnimLayer(camX, camY, viewW, viewH);   // layer animasi (di atas karakter)
+  if (shadowImg) drawShadow(camX, camY, viewW, viewH);                            // layer bayangan: di atas karakter, di bawah layer atas
   if (overlayImg) drawOverlay(camX, camY, viewW, viewH);                          // layer atas: di atas karakter, tanpa tabrakan
   if (animLayerFrames.length && CONFIG.animLayerPosition === "teratas") drawAnimLayer(camX, camY, viewW, viewH);   // layer animasi (di atas layer-atas.png)
   for (const v of visible) drawNameTag(v.px, v.py, v.c.name);                     // nama di atas semua karakter
@@ -1304,7 +1450,7 @@ async function loadBackgrounds() {
   return img ? [img] : [];
 }
 
-Promise.all([loadAllBodies(), loadBackgrounds(), loadImage(CONFIG.layerImage, true), loadImage(CONFIG.overlayImage, true), loadAnimLayer()]).then(([, bgs, layer, overlay, animFrames]) => {
+Promise.all([loadAllBodies(), loadBackgrounds(), loadLayerWithMask(CONFIG.layerImage), loadLayerTiled(CONFIG.overlayImage, CONFIG.overlayMode), loadLayerTiled(CONFIG.shadowImage, CONFIG.shadowMode), inOrder(loadAnimLayer)]).then(async ([, bgs, layer, overlay, shadow, animFrames]) => {
   bgFrames = bgs;
   animLayerFrames = animFrames || [];
   if (animLayerFrames.length) {
@@ -1315,7 +1461,14 @@ Promise.all([loadAllBodies(), loadBackgrounds(), loadImage(CONFIG.layerImage, tr
     if (animLayerFrames.some(f => f.width !== a.width || f.height !== a.height))
       console.warn("Frame layer animasi tidak sama ukurannya. Samakan semua frame.");
   }
-  overlayImg = overlay || null;
+  shadowImg = shadow ? shadow.tiled : null;
+  if (shadow) {
+    console.info(`Layer bayangan dimuat: ${shadow.width}x${shadow.height} (di atas karakter, di bawah layer atas)`);
+    if (layer && CONFIG.layerMode === "map" && CONFIG.shadowMode === "map" && (shadow.width !== layer.width || shadow.height !== layer.height))
+      console.warn(`Ukuran layer bayangan (${shadow.width}x${shadow.height}) beda dengan layer (${layer.width}x${layer.height}). Samakan keduanya supaya posisinya pas.`);
+  } else console.info("Layer bayangan tidak ada (" + CONFIG.shadowImage + "), dilewati.");
+  if (shadowImg && shadowImg.tiles && CONFIG.shadowMode === "map" && CONFIG.shadowStretchPx > 0) buildShadowDilated(shadowImg);   // siapkan animasi regang (di latar belakang)
+  overlayImg = overlay ? overlay.tiled : null;
   if (overlay) {
     console.info(`Layer atas dimuat: ${overlay.width}x${overlay.height} (di atas karakter, tanpa tabrakan)`);
     if (layer && CONFIG.layerMode === "map" && CONFIG.overlayMode === "map" && (overlay.width !== layer.width || overlay.height !== layer.height))
@@ -1343,8 +1496,7 @@ Promise.all([loadAllBodies(), loadBackgrounds(), loadImage(CONFIG.layerImage, tr
     player.y = CONFIG.worldHeight / 2 + (Math.random() * 400 - 200);
   }
   if (layer) {
-    buildLayerMask(layer);
-    placeOnFreeSpot();
+    placeOnFreeSpot();                       // peta tabrakan sudah dibuat saat layer dimuat (loadLayerWithMask)
   }
   else console.warn("File layer tidak ditemukan: " + CONFIG.layerImage + " (nama harus persis, huruf besar/kecil berpengaruh)");
   if (!bgFrames.length) console.warn("Gambar latar tidak ditemukan (assets/background.png)");
@@ -1359,8 +1511,8 @@ Promise.all([loadAllBodies(), loadBackgrounds(), loadImage(CONFIG.layerImage, tr
   refreshPreview();
   buildPanel();
   updateNetStatus();
-  if (!playerName) openNameMenu();     // pengunjung baru: minta nama dulu
-  else netConnect();                   // sudah punya nama: langsung masuk ke server
+  if (!playerName) openNameMenu();     // pengunjung baru: minta nama dulu (panduan tombol muncul setelahnya)
+  else { netConnect(); maybeShowInfo(); }   // sudah punya nama: langsung masuk ke server
   requestAnimationFrame(loop);
 });
 
@@ -1376,7 +1528,7 @@ Promise.all([loadAllBodies(), loadBackgrounds(), loadImage(CONFIG.layerImage, tr
   btn.addEventListener("click", () => menu.classList.toggle("open"));
   menu.addEventListener("click", e => {
     const b = e.target.closest("button");
-    if (b && (b.id === "btnName" || b.id === "btnCostume")) close();   // membuka panel lain: tutup menu
+    if (b && (b.id === "btnName" || b.id === "btnCostume" || b.id === "btnInfo")) close();   // membuka panel lain: tutup menu
   });
   // klik/sentuh di luar menu (termasuk tombol arah di layar) -> menu tutup
   document.addEventListener("pointerdown", e => {
